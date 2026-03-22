@@ -1,0 +1,163 @@
+@import "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 25% 97%;
+    --foreground: 220 25% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 10%;
+
+    --primary: 210 80% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 92%;
+    --secondary-foreground: 220 25% 10%;
+
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 10% 45%;
+
+    --accent: 174 70% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --emergency: 0 85% 55%;
+    --emergency-foreground: 0 0% 100%;
+
+    --clinical: 210 80% 50%;
+    --clinical-foreground: 0 0% 100%;
+
+    --success: 142 70% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 210 80% 50%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 220 25% 97%;
+    --sidebar-foreground: 220 25% 10%;
+    --sidebar-primary: 210 80% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 94%;
+    --sidebar-accent-foreground: 220 25% 10%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 210 80% 50%;
+  }
+
+  .dark {
+    --background: 222 30% 6%;
+    --foreground: 210 20% 95%;
+
+    --card: 222 25% 10%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 222 25% 10%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 210 80% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 20% 16%;
+    --secondary-foreground: 210 20% 95%;
+
+    --muted: 222 20% 14%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 174 70% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --emergency: 0 85% 55%;
+    --emergency-foreground: 0 0% 100%;
+
+    --clinical: 210 80% 55%;
+    --clinical-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 222 20% 18%;
+    --input: 222 20% 18%;
+    --ring: 210 80% 55%;
+
+    --sidebar-background: 222 25% 8%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 210 80% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 20% 14%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 222 20% 18%;
+    --sidebar-ring: 210 80% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl shadow-lg;
+  }
+  .glass-card-strong {
+    @apply bg-card/90 backdrop-blur-2xl border border-border/60 rounded-xl shadow-xl;
+  }
+  .glow-emergency {
+    box-shadow: 0 0 20px hsl(var(--emergency) / 0.3), 0 0 60px hsl(var(--emergency) / 0.1);
+  }
+  .glow-clinical {
+    box-shadow: 0 0 20px hsl(var(--clinical) / 0.3), 0 0 60px hsl(var(--clinical) / 0.1);
+  }
+  .glow-success {
+    box-shadow: 0 0 20px hsl(var(--success) / 0.3), 0 0 60px hsl(var(--success) / 0.1);
+  }
+  .gradient-emergency {
+    background: linear-gradient(135deg, hsl(var(--emergency)), hsl(var(--emergency) / 0.7));
+  }
+  .gradient-clinical {
+    background: linear-gradient(135deg, hsl(var(--clinical)), hsl(210 90% 40%));
+  }
+  .gradient-hero {
+    background: linear-gradient(135deg, hsl(222 30% 6%), hsl(222 25% 12%), hsl(210 40% 15%));
+  }
+  .pulse-emergency {
+    animation: pulseEmergency 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase;
+  }
+}
+
+@keyframes pulseEmergency {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--emergency) / 0.4); }
+  50% { box-shadow: 0 0 0 12px hsl(var(--emergency) / 0); }
+}
+
+.leaflet-container {
+  border-radius: var(--radius);
+  z-index: 1;
+}
