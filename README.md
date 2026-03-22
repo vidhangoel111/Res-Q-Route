@@ -186,9 +186,8 @@ Default seeded/demo identities used in project:
 - user@resqroute.in
 - hospital@resqroute.in
 - admin@resqroute.in
-
-Backend seed password (for seeded backend users):
-- Password@123
+Note:
+Use any Email id and password
 
 Note:
 - The current frontend auth context accepts entered credentials for role simulation in the UI flow.
