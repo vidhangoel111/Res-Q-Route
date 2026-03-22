@@ -188,7 +188,7 @@ Default seeded/demo identities used in project:
 - admin@resqroute.in
 
 Note:
-Use any Email id and password
+- Use any Email id and password
 
 Note:
 - The current frontend auth context accepts entered credentials for role simulation in the UI flow.
