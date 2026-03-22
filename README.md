@@ -186,6 +186,7 @@ Default seeded/demo identities used in project:
 - user@resqroute.in
 - hospital@resqroute.in
 - admin@resqroute.in
+
 Note:
 Use any Email id and password
 
