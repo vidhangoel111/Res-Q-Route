@@ -241,4 +241,5 @@ npm run test
 
 - Frontend and backend are decoupled but kept in one monorepo-style layout.
 - The backend contains additional implementation details in lifeline-backend/README.md.
-
+## Updates
+- Added Firebase Google Authentication
