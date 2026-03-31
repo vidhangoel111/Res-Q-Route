@@ -7,22 +7,18 @@ interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  photoURL?: string;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   login: (email: string, password: string, role: UserRole) => boolean;
+  loginAsAdmin: (googleUser: { id: string; name: string; email: string; photoURL?: string }) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
-const DEMO_USERS: Record<UserRole, AuthUser> = {
-  user: { id: "u1", name: "Rahul Sharma", email: "user@resqroute.in", role: "user" },
-  hospital: { id: "h1", name: "City General Hospital", email: "hospital@resqroute.in", role: "hospital" },
-  admin: { id: "a1", name: "Admin Control", email: "admin@resqroute.in", role: "admin" },
-};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(() => {
@@ -43,13 +39,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return true;
   }, []);
 
+  const loginAsAdmin = useCallback(
+    (googleUser: { id: string; name: string; email: string; photoURL?: string }) => {
+      const authUser: AuthUser = {
+        id: googleUser.id,
+        name: googleUser.name,
+        email: googleUser.email,
+        role: "admin",
+        photoURL: googleUser.photoURL,
+      };
+      setUser(authUser);
+      localStorage.setItem("resqroute_user", JSON.stringify(authUser));
+    },
+    []
+  );
+
   const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem("resqroute_user");
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, loginAsAdmin, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

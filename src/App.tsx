@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import RoleSelect from "./pages/RoleSelect";
 import Login from "./pages/Login";
+import AdminAuth from "./pages/AdminAuth";
 import UserDashboard from "./pages/UserDashboard";
 import HospitalDashboard from "./pages/HospitalDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -19,7 +20,10 @@ const App = () => (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<RoleSelect />} />
+        {/* Standard login for user & hospital roles */}
         <Route path="/login/:role" element={<Login />} />
+        {/* Dedicated admin auth portal with Google OAuth */}
+        <Route path="/admin-auth" element={<AdminAuth />} />
         <Route path="/dashboard/user" element={<ProtectedRoute role="user"><UserDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/hospital" element={<ProtectedRoute role="hospital"><HospitalDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />

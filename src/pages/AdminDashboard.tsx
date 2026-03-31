@@ -2,10 +2,16 @@ import { useAuth } from "@/context/AuthContext";
 import { Activity, LogOut, AlertTriangle, Clock, TrendingDown, BarChart3, Truck, Bed, FileText } from "lucide-react";
 import { MOCK_ANALYTICS } from "@/data/mockData";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 const AdminDashboard = () => {
-  const { logout } = useAuth();
-  const handleLogout = () => { logout(); window.location.href = "/"; };
+  const { user, logout } = useAuth();
+  const handleLogout = async () => {
+    try { await signOut(auth); } catch { /* already signed out */ }
+    logout();
+    window.location.href = "/";
+  };
   const d = MOCK_ANALYTICS;
 
   const auditLogs = [
@@ -25,7 +31,22 @@ const AdminDashboard = () => {
             <span className="text-lg font-bold">Res<span className="text-emergency">Q</span>Route</span>
             <span className="text-xs bg-emergency/20 text-emergency px-2 py-0.5 rounded-full font-medium ml-2">Admin</span>
           </div>
-          <button onClick={handleLogout} className="text-muted-foreground hover:text-foreground p-2"><LogOut className="w-4 h-4" /></button>
+          <div className="flex items-center gap-3">
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt={user.name} className="w-8 h-8 rounded-full border-2 border-emergency/40 object-cover" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-emergency/20 border-2 border-emergency/40 flex items-center justify-center text-emergency text-sm font-bold">
+                {user?.name?.charAt(0).toUpperCase() ?? "A"}
+              </div>
+            )}
+            <div className="hidden sm:block text-left">
+              <p className="text-xs font-semibold text-foreground leading-tight">{user?.name ?? "Admin"}</p>
+              <p className="text-xs text-muted-foreground leading-tight">{user?.email}</p>
+            </div>
+            <button onClick={handleLogout} className="text-muted-foreground hover:text-foreground p-2 ml-1" title="Sign out">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 

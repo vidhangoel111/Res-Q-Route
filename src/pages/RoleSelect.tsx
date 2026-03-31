@@ -34,7 +34,7 @@ const RoleSelect = () => {
         {roles.map((role, i) => (
           <button
             key={role.key}
-            onClick={() => navigate(`/login/${role.key}`)}
+            onClick={() => navigate(role.key === "admin" ? "/admin-auth" : `/login/${role.key}`)}
             className="glass-card-strong p-8 flex flex-col items-center gap-4 cursor-pointer group transition-all hover:border-primary/40 hover:scale-[1.03] animate-fade-in"
             style={{ animationDelay: `${i * 150}ms` }}
           >

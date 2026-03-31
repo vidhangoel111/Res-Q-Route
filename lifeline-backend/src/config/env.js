@@ -6,7 +6,7 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3001),
-  DB_PROVIDER: z.enum(["mongo", "mysql"]).default("mongo"),
+  DB_PROVIDER: z.enum(["mongo", "mysql", "memory"]).default("memory"),
   MONGO_URI: z.string().optional(),
   MYSQL_HOST: z.string().default("localhost"),
   MYSQL_PORT: z.coerce.number().int().positive().default(3306),
