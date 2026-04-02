@@ -12,8 +12,8 @@
 export const ADMIN_WHITELIST: string[] = [
   // ↓ Add your team Google emails below:
   "vidhan.goel18@gmail.com",           // example placeholder
-  // "yourname@gmail.com",        // replace with real team emails
-  // "teammate@gmail.com",
+  "aashishdhiman2021@gmail.com",        // replace with real team emails
+  "pankajjoshi2177@gmail.com"
 ];
 
 export const isAdminEmail = (email: string): boolean => {
