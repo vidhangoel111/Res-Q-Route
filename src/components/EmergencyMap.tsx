@@ -68,7 +68,7 @@ const EmergencyMap = ({ center, userPos, ambulancePos, hospitalPos, allAmbulance
 
   if (!MapComponents) {
     return (
-      <div className="flex items-center justify-center bg-muted rounded-xl" style={{ height: "400px" }}>
+      <div className="map-loading flex items-center justify-center bg-muted rounded-xl">
         <p className="text-muted-foreground">Loading map...</p>
       </div>
     );
@@ -95,7 +95,7 @@ const EmergencyMap = ({ center, userPos, ambulancePos, hospitalPos, allAmbulance
     <MapContainer
       center={center}
       zoom={13}
-      style={{ height: "100%", minHeight: "400px", width: "100%", borderRadius: "0.75rem" }}
+      className="map-container-shell"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -108,11 +108,11 @@ const EmergencyMap = ({ center, userPos, ambulancePos, hospitalPos, allAmbulance
       {allHospitals?.map(h => (
         <Marker key={h.id} position={[h.lat, h.lng]} icon={h.id === selectedHospitalId ? hospitalIcon : hospitalIconDim}>
           <Popup>
-            <div style={{ minWidth: 140 }}>
+            <div className="popup-card">
               <strong>🏥 {h.name}</strong><br/>
               ICU: {h.icuBeds} | ER: {h.emergencyBeds}<br/>
               Occupancy: {h.occupancy}%
-              {h.id === selectedHospitalId && <><br/><span style={{ color: '#3182CE', fontWeight: 'bold' }}>✓ Selected</span></>}
+              {h.id === selectedHospitalId && <><br/><span className="popup-selected">✓ Selected</span></>}
             </div>
           </Popup>
         </Marker>
@@ -122,7 +122,7 @@ const EmergencyMap = ({ center, userPos, ambulancePos, hospitalPos, allAmbulance
       {allAmbulances?.filter(a => a.id !== selectedAmbulanceId).map(a => (
         <Marker key={a.id} position={[a.lat, a.lng]} icon={ambulanceIconDim}>
           <Popup>
-            <div style={{ minWidth: 120 }}>
+            <div className="popup-card popup-card-sm">
               <strong>🚑 {a.vehicleNo}</strong><br/>
               {a.driverName}<br/>
               Status: {a.status}

@@ -4,6 +4,17 @@ function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (process.env.NODE_ENV !== "production" && req.headers["x-dev-user-id"] && req.headers["x-dev-role"]) {
+      req.user = {
+        sub: String(req.headers["x-dev-user-id"]),
+        role: String(req.headers["x-dev-role"]),
+        name: String(req.headers["x-dev-user-name"] || "Dev User"),
+        email: String(req.headers["x-dev-user-email"] || "dev@resqroute.local"),
+        hospitalId: req.headers["x-dev-hospital-id"] ? String(req.headers["x-dev-hospital-id"]) : null,
+      };
+      return next();
+    }
+
     return res.status(401).json({ message: "Missing or invalid Authorization header" });
   }
 

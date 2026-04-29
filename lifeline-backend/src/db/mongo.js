@@ -61,10 +61,26 @@ const emergencySchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
+const hospitalHistorySchema = new mongoose.Schema(
+  {
+    id: { type: String, unique: true, index: true },
+    hospitalId: { type: String, default: null, index: true },
+    hospitalName: { type: String, default: null },
+    action: { type: String, required: true },
+    details: { type: String, default: "" },
+    actorUserId: { type: String, default: null },
+    actorName: { type: String, default: null },
+    source: { type: String, default: "admin" },
+    emergencyId: { type: String, default: null },
+  },
+  { timestamps: true, versionKey: false }
+);
+
 const User = mongoose.model("User", userSchema);
 const Hospital = mongoose.model("Hospital", hospitalSchema);
 const Ambulance = mongoose.model("Ambulance", ambulanceSchema);
 const Emergency = mongoose.model("Emergency", emergencySchema);
+const HospitalHistory = mongoose.model("HospitalHistory", hospitalHistorySchema);
 
 function normalize(doc) {
   if (!doc) return null;
@@ -102,6 +118,17 @@ async function findUserById(id) {
   return normalize(await User.findOne({ id }));
 }
 
+async function listUsers() {
+  const docs = await User.find().sort({ createdAt: -1 });
+  return docs.map((doc) => {
+    const plain = normalize(doc);
+    if (plain) {
+      delete plain.passwordHash;
+    }
+    return plain;
+  });
+}
+
 async function createUser(payload) {
   const user = await User.create({ id: payload.id || randomUUID(), ...payload });
   return normalize(user);
@@ -119,6 +146,16 @@ async function getHospitalById(id) {
 async function updateHospitalBeds(id, updates) {
   const hospital = await Hospital.findOneAndUpdate({ id }, { $set: updates }, { new: true });
   return normalize(hospital);
+}
+
+async function createHospitalHistory(payload) {
+  const entry = await HospitalHistory.create({ id: payload.id || randomUUID(), ...payload });
+  return normalize(entry);
+}
+
+async function listHospitalHistory(filters = {}) {
+  const docs = await HospitalHistory.find(filters).sort({ createdAt: -1 });
+  return docs.map(normalize);
 }
 
 async function listAmbulances(filters = {}) {
@@ -161,10 +198,13 @@ module.exports = {
   seed,
   findUserByEmail,
   findUserById,
+  listUsers,
   createUser,
   listHospitals,
   getHospitalById,
   updateHospitalBeds,
+  createHospitalHistory,
+  listHospitalHistory,
   listAmbulances,
   getAmbulanceById,
   updateAmbulance,

@@ -45,6 +45,17 @@ router.patch(
     }
 
     const updated = await db.updateHospitalBeds(hospitalId, req.validated.body);
+
+    await db.createHospitalHistory({
+      hospitalId: updated.id,
+      hospitalName: updated.name,
+      action: "BED_UPDATE",
+      details: `ICU beds: ${existing.icuBeds} → ${updated.icuBeds}; Emergency beds: ${existing.emergencyBeds} → ${updated.emergencyBeds}; Occupancy: ${existing.occupancy}% → ${updated.occupancy}%`,
+      actorUserId: req.user.sub,
+      actorName: req.user.name,
+      source: "hospital",
+    });
+
     res.json(updated);
   })
 );

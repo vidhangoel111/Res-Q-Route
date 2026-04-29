@@ -20,6 +20,11 @@ function mapRow(row) {
     etaSeconds: row.etaSeconds ?? row.eta_seconds,
     createdByUserId: row.createdByUserId ?? row.created_by_user_id,
     patientName: row.patientName ?? row.patient_name,
+    hospitalName: row.hospitalName ?? row.hospital_name,
+    actorUserId: row.actorUserId ?? row.actor_user_id,
+    actorName: row.actorName ?? row.actor_name,
+    source: row.source,
+    emergencyId: row.emergencyId ?? row.emergency_id,
   };
 }
 
@@ -100,6 +105,22 @@ async function migrate() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hospital_history (
+      id VARCHAR(64) PRIMARY KEY,
+      hospital_id VARCHAR(64) NULL,
+      hospital_name VARCHAR(160) NULL,
+      action VARCHAR(80) NOT NULL,
+      details TEXT NOT NULL,
+      actor_user_id VARCHAR(64) NULL,
+      actor_name VARCHAR(160) NULL,
+      source VARCHAR(30) NOT NULL DEFAULT 'admin',
+      emergency_id VARCHAR(64) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
 }
 
 async function disconnect() {
@@ -144,6 +165,11 @@ async function findUserById(id) {
   return mapRow(rows[0]);
 }
 
+async function listUsers() {
+  const [rows] = await pool.query("SELECT id, name, email, role, hospital_id, created_at, updated_at FROM users ORDER BY created_at DESC");
+  return rows.map(mapRow);
+}
+
 async function createUser(payload) {
   const user = {
     id: payload.id || randomUUID(),
@@ -179,6 +205,56 @@ async function updateHospitalBeds(id, updates) {
     [updates.icuBeds, updates.emergencyBeds, updates.occupancy, id]
   );
   return getHospitalById(id);
+}
+
+async function createHospitalHistory(payload) {
+  const entry = {
+    id: payload.id || randomUUID(),
+    ...payload,
+  };
+
+  await pool.query(
+    `INSERT INTO hospital_history (
+      id, hospital_id, hospital_name, action, details, actor_user_id, actor_name, source, emergency_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      entry.id,
+      entry.hospitalId || null,
+      entry.hospitalName || null,
+      entry.action,
+      entry.details || "",
+      entry.actorUserId || null,
+      entry.actorName || null,
+      entry.source || "admin",
+      entry.emergencyId || null,
+    ]
+  );
+
+  return entry;
+}
+
+async function listHospitalHistory(filters = {}) {
+  const clauses = [];
+  const args = [];
+
+  if (filters.hospitalId) {
+    clauses.push("hospital_id = ?");
+    args.push(filters.hospitalId);
+  }
+
+  if (filters.source) {
+    clauses.push("source = ?");
+    args.push(filters.source);
+  }
+
+  const whereClause = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const [rows] = await pool.query(
+    `SELECT id, hospital_id, hospital_name, action, details, actor_user_id, actor_name, source, emergency_id, created_at, updated_at
+     FROM hospital_history ${whereClause} ORDER BY created_at DESC`,
+    args
+  );
+
+  return rows.map(mapRow);
 }
 
 async function listAmbulances(filters = {}) {
@@ -326,10 +402,13 @@ module.exports = {
   seed,
   findUserByEmail,
   findUserById,
+  listUsers,
   createUser,
   listHospitals,
   getHospitalById,
   updateHospitalBeds,
+  createHospitalHistory,
+  listHospitalHistory,
   listAmbulances,
   getAmbulanceById,
   updateAmbulance,

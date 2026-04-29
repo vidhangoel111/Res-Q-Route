@@ -4,6 +4,8 @@ import { Activity, LogOut, AlertTriangle, Clock, CheckCircle2, Truck, Building2,
 import { EmergencyRequest, EmergencyStatus, SeverityLevel, Ambulance, Hospital as HospitalType } from "@/data/types";
 import { EMERGENCY_TYPES, classifySeverity, generateEmergencyId, findNearestAmbulance, findBestHospital, MOCK_AMBULANCES, MOCK_HOSPITALS, interpolateRoute, haversineDistance, TRAFFIC_ZONES } from "@/data/mockData";
 import { Progress } from "@/components/ui/progress";
+import { RealTimeEmergencyMap } from "@/components/RealTimeEmergencyMap";
+import { apiFetch } from "@/lib/api";
 
 const STATUS_FLOW: EmergencyStatus[] = ["SUBMITTED", "CLASSIFIED", "ASSIGNED", "EN_ROUTE", "ARRIVED", "TRANSPORTING", "COMPLETED"];
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api") as string;
@@ -79,18 +81,6 @@ interface DecisionStep {
   detail?: string;
 }
 
-interface EmergencyMapProps {
-  center: [number, number];
-  userPos?: [number, number];
-  ambulancePos?: [number, number];
-  hospitalPos?: [number, number];
-  allAmbulances?: Ambulance[];
-  allHospitals?: HospitalType[];
-  selectedAmbulanceId?: string;
-  selectedHospitalId?: string;
-  onMapClick?: (lat: number, lng: number) => void;
-}
-
 const DECISION_STEPS: Omit<DecisionStep, "status" | "detail">[] = [
   { id: "scan", icon: <Cpu className="w-4 h-4" />, message: "Analyzing live ambulance data…" },
   { id: "ambulance", icon: <Search className="w-4 h-4" />, message: "Finding nearest available ambulance…" },
@@ -106,8 +96,16 @@ const UserDashboard = () => {
   const [form, setForm] = useState({ patientName: "", phone: "", type: "", description: "", lat: 28.6100, lng: 77.2200 });
   const [eta, setEta] = useState(0);
   const [rating, setRating] = useState(0);
-  const [MapComp, setMapComp] = useState<React.ComponentType<EmergencyMapProps> | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // AI Decision engine state
+  const [isDeciding, setIsDeciding] = useState(false);
+  const [decisionSteps, setDecisionSteps] = useState<DecisionStep[]>([]);
+  const [decisionProgress, setDecisionProgress] = useState(0);
+  const [ambulanceScores, setAmbulanceScores] = useState<{ amb: Ambulance; dist: number; trafficMult: number; score: number }[]>([]);
+  const [hospitalScores, setHospitalScores] = useState<{ hosp: HospitalType; dist: number; occupancy: number; score: number }[]>([]);
+  const [liveAmbulances, setLiveAmbulances] = useState<Ambulance[]>(MOCK_AMBULANCES);
+  const [liveHospitals, setLiveHospitals] = useState<HospitalType[]>(MOCK_HOSPITALS);
+
+  // Other state
   const [ambulancePos, setAmbulancePos] = useState<[number, number] | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
   const [locationSuggestions, setLocationSuggestions] = useState<{ displayName: string; lat: number; lng: number }[]>([]);
@@ -116,20 +114,48 @@ const UserDashboard = () => {
   const [isLocating, setIsLocating] = useState(false);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [liveTrackingEnabled, setLiveTrackingEnabled] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationWatchRef = useRef<number | null>(null);
-
-  // AI Decision engine state
-  const [isDeciding, setIsDeciding] = useState(false);
-  const [decisionSteps, setDecisionSteps] = useState<DecisionStep[]>([]);
-  const [decisionProgress, setDecisionProgress] = useState(0);
-  const [ambulanceScores, setAmbulanceScores] = useState<{ amb: Ambulance; dist: number; trafficMult: number; score: number }[]>([]);
-  const [hospitalScores, setHospitalScores] = useState<{ hosp: HospitalType; dist: number; occupancy: number; score: number }[]>([]);
 
   const handleLogout = () => { logout(); window.location.href = "/"; };
 
   useEffect(() => {
-    import("@/components/EmergencyMap").then(mod => setMapComp(() => mod.default)).catch(() => {});
+    let alive = true;
+
+    const loadReferenceData = async () => {
+      try {
+        const [ambulancesResponse, hospitalsResponse] = await Promise.all([
+          apiFetch("/ambulances"),
+          apiFetch("/hospitals"),
+        ]);
+
+        const [ambulanceRows, hospitalRows] = await Promise.all([
+          ambulancesResponse.ok ? ambulancesResponse.json() : Promise.resolve([]),
+          hospitalsResponse.ok ? hospitalsResponse.json() : Promise.resolve([]),
+        ]);
+
+        if (!alive) return;
+
+        if (Array.isArray(ambulanceRows) && ambulanceRows.length) {
+          setLiveAmbulances(ambulanceRows);
+        }
+
+        if (Array.isArray(hospitalRows) && hospitalRows.length) {
+          setLiveHospitals(hospitalRows);
+        }
+      } catch {
+        // Fallback to the built-in demo data when the backend is unavailable.
+      }
+    };
+
+    loadReferenceData();
+    return () => {
+      alive = false;
+    };
   }, []);
+
+  const ambulanceCatalog = liveAmbulances.length ? liveAmbulances : MOCK_AMBULANCES;
+  const hospitalCatalog = liveHospitals.length ? liveHospitals : MOCK_HOSPITALS;
 
   const getTrafficMultiplier = (lat: number, lng: number) => {
     for (const zone of TRAFFIC_ZONES) {
@@ -150,7 +176,7 @@ const UserDashboard = () => {
 
     // Step 1: Scan ambulances
     setTimeout(() => {
-      setDecisionSteps(prev => prev.map(s => s.id === "scan" ? { ...s, status: "active", detail: `Scanning ${MOCK_AMBULANCES.length} ambulances across the network…` } : s));
+      setDecisionSteps(prev => prev.map(s => s.id === "scan" ? { ...s, status: "active", detail: `Scanning ${ambulanceCatalog.length} ambulances across the network…` } : s));
       setDecisionProgress(10);
     }, stepDelay * 0);
 
@@ -159,7 +185,7 @@ const UserDashboard = () => {
       setDecisionSteps(prev => prev.map(s => s.id === "scan" ? { ...s, status: "done" } : s.id === "ambulance" ? { ...s, status: "active" } : s));
       setDecisionProgress(25);
 
-      const available = MOCK_AMBULANCES.filter(a => a.status === "available");
+      const available = ambulanceCatalog.filter(a => a.status === "available");
       const scored = available.map(amb => {
         const dist = haversineDistance(form.lat, form.lng, amb.lat, amb.lng);
         const trafficMult = getTrafficMultiplier(amb.lat, amb.lng);
@@ -176,7 +202,7 @@ const UserDashboard = () => {
 
     // Step 3: Evaluate hospitals
     setTimeout(() => {
-      setDecisionSteps(prev => prev.map(s => s.id === "hospital_eval" ? { ...s, status: "active", detail: `Checking ${MOCK_HOSPITALS.length} hospitals for bed availability & distance…` } : s));
+      setDecisionSteps(prev => prev.map(s => s.id === "hospital_eval" ? { ...s, status: "active", detail: `Checking ${hospitalCatalog.length} hospitals for bed availability & distance…` } : s));
       setDecisionProgress(45);
     }, stepDelay * 3.5);
 
@@ -185,7 +211,7 @@ const UserDashboard = () => {
       setDecisionSteps(prev => prev.map(s => s.id === "hospital_eval" ? { ...s, status: "done" } : s));
       setDecisionProgress(60);
 
-      const scored = MOCK_HOSPITALS.filter(h => h.emergencyBeds > 0 || h.icuBeds > 0).map(hosp => {
+      const scored = hospitalCatalog.filter(h => h.emergencyBeds > 0 || h.icuBeds > 0).map(hosp => {
         const dist = haversineDistance(form.lat, form.lng, hosp.lat, hosp.lng);
         return { hosp, dist, occupancy: hosp.occupancy, score: dist + (hosp.occupancy / 100) };
       }).sort((a, b) => a.score - b.score);
@@ -337,8 +363,8 @@ const UserDashboard = () => {
   };
 
   const createEmergency = (severity: SeverityLevel) => {
-    const amb = findNearestAmbulance(form.lat, form.lng, MOCK_AMBULANCES);
-    const hosp = findBestHospital(form.lat, form.lng, MOCK_HOSPITALS);
+    const amb = findNearestAmbulance(form.lat, form.lng, ambulanceCatalog);
+    const hosp = findBestHospital(form.lat, form.lng, hospitalCatalog);
     const dist = amb ? haversineDistance(form.lat, form.lng, amb.lat, amb.lng) : 5;
     const etaSec = Math.min(Math.round(dist * 120 + Math.random() * 60), 30);
     const baseline = Math.round(dist * 200);
@@ -353,6 +379,22 @@ const UserDashboard = () => {
     setEmergency(req);
     setEta(etaSec);
     if (amb) setAmbulancePos([amb.lat, amb.lng]);
+
+    void apiFetch("/emergencies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        patientName: form.patientName,
+        phone: form.phone,
+        type: form.type,
+        description: form.description,
+        lat: form.lat,
+        lng: form.lng,
+        severity,
+      }),
+    }).catch(() => {
+      // Demo UI still runs even if the backend is temporarily unavailable.
+    });
 
     setTimeout(() => setEmergency(p => p ? { ...p, status: "CLASSIFIED" } : null), 1500);
     setTimeout(() => setEmergency(p => p ? { ...p, status: "ASSIGNED" } : null), 3000);
@@ -411,7 +453,6 @@ const UserDashboard = () => {
 
   const formatEta = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
   const statusIdx = emergency ? STATUS_FLOW.indexOf(emergency.status) : -1;
-  const EMap = MapComp;
   const currentAmbulancePosition = emergency?.assignedAmbulance
     ? (ambulancePos || [emergency.assignedAmbulance.lat, emergency.assignedAmbulance.lng] as [number, number])
     : null;
@@ -621,17 +662,12 @@ const UserDashboard = () => {
               </div>
             </div>
             <div className="glass-card p-2 min-h-[400px]">
-              {EMap ? (
-                <EMap
-                  center={[form.lat, form.lng]}
-                  userPos={[form.lat, form.lng]}
-                  allAmbulances={MOCK_AMBULANCES}
-                  allHospitals={MOCK_HOSPITALS}
-                  onMapClick={(lat: number, lng: number) => setForm(f => ({ ...f, lat, lng }))}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full min-h-[400px] bg-muted rounded-xl"><p className="text-muted-foreground">Loading map...</p></div>
-              )}
+              <RealTimeEmergencyMap
+                center={[form.lat, form.lng]}
+                userPos={[form.lat, form.lng]}
+                allAmbulances={ambulanceCatalog}
+                allHospitals={hospitalCatalog}
+              />
             </div>
           </div>
         ) : emergency ? (
@@ -674,19 +710,15 @@ const UserDashboard = () => {
             </div>
             <div className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 glass-card p-2 min-h-[400px]">
-                {EMap ? (
-                  <EMap
-                    center={[emergency.lat, emergency.lng]}
-                    userPos={[emergency.lat, emergency.lng]}
-                    ambulancePos={ambulancePos || undefined}
-                    allAmbulances={MOCK_AMBULANCES}
-                    allHospitals={MOCK_HOSPITALS}
-                    selectedAmbulanceId={emergency.assignedAmbulance?.id}
-                    selectedHospitalId={emergency.assignedHospital?.id}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full min-h-[400px] bg-muted rounded-xl"><p className="text-muted-foreground">Loading map...</p></div>
-                )}
+                <RealTimeEmergencyMap
+                  center={[emergency.lat, emergency.lng]}
+                  userPos={[emergency.lat, emergency.lng]}
+                  ambulancePos={ambulancePos || undefined}
+                  allAmbulances={ambulanceCatalog}
+                  allHospitals={hospitalCatalog}
+                  selectedAmbulanceId={emergency.assignedAmbulance?.id}
+                  selectedHospitalId={emergency.assignedHospital?.id}
+                />
               </div>
               <div className="space-y-4">
                 {emergency.assignedAmbulance && (
@@ -731,7 +763,7 @@ const UserDashboard = () => {
                 <div className="glass-card p-4">
                   <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2"><Truck className="w-4 h-4" /> Fleet Status</h3>
                   <div className="space-y-2">
-                    {MOCK_AMBULANCES.map(a => (
+                    {ambulanceCatalog.map(a => (
                       <div key={a.id} className={`flex items-center justify-between text-xs px-2 py-1.5 rounded-lg ${a.id === emergency.assignedAmbulance?.id ? "bg-success/15 border border-success/30" : "bg-muted/50"}`}>
                         <span className="text-foreground font-medium">{a.vehicleNo}</span>
                         <span className={`status-badge text-[10px] px-2 py-0.5 ${

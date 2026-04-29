@@ -15,7 +15,7 @@ const envSchema = z.object({
   MYSQL_DATABASE: z.string().default("lifeline_response"),
   JWT_SECRET: z.string().min(16).default("change-this-super-secret-key"),
   JWT_EXPIRES_IN: z.string().default("1h"),
-  FRONTEND_ORIGIN: z.string().default("http://localhost:8080,http://localhost:5173"),
+  FRONTEND_ORIGIN: z.string().default("http://localhost:8000,http://localhost:5173"),
 });
 
 const parsed = envSchema.safeParse(process.env);

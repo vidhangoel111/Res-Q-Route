@@ -1,0 +1,583 @@
+{
+  "communities": {
+    "0": [
+      "lifeline_backend_src_db_memory_js",
+      "lifeline_backend_src_routes_location_routes_js",
+      "location_routes_getcached",
+      "location_routes_setcached",
+      "memory_clone",
+      "memory_clonelist",
+      "memory_connect",
+      "memory_createemergency",
+      "memory_createuser",
+      "memory_disconnect",
+      "memory_finduserbyemail",
+      "memory_finduserbyid",
+      "memory_getambulancebyid",
+      "memory_getemergencybyid",
+      "memory_gethospitalbyid",
+      "memory_listambulances",
+      "memory_listemergencies",
+      "memory_listhospitals",
+      "memory_now",
+      "memory_seed",
+      "memory_updateambulance",
+      "memory_updateemergency",
+      "memory_updatehospitalbeds",
+      "memory_withseedtimestamps"
+    ],
+    "1": [
+      "emergency_routes_islikelyduplicate",
+      "lifeline_backend_src_routes_emergency_routes_js",
+      "mockdata_classifyseverity",
+      "mockdata_findbesthospital",
+      "mockdata_findnearestambulance",
+      "mockdata_generateemergencyid",
+      "mockdata_haversinedistance",
+      "mockdata_interpolateroute",
+      "src_data_mockdata_ts",
+      "src_pages_userdashboard_tsx",
+      "userdashboard_applydetectedcoordinates",
+      "userdashboard_choosesuggestedlocation",
+      "userdashboard_createemergency",
+      "userdashboard_formateta",
+      "userdashboard_getexpertadvice",
+      "userdashboard_gettrafficmultiplier",
+      "userdashboard_handlelogout",
+      "userdashboard_rundecisionengine",
+      "userdashboard_searchtypedlocation",
+      "userdashboard_submitemergency",
+      "userdashboard_togglelivetracking",
+      "userdashboard_usecurrentlocation"
+    ],
+    "2": [
+      "hospitaldashboard_handlelogout",
+      "hospitaldashboard_log",
+      "hospitaldashboard_toggleambulancestatus",
+      "hospitaldashboard_updatebeds",
+      "lifeline_backend_src_config_socket_js",
+      "lifeline_backend_src_server_js",
+      "lifeline_backend_src_services_seedservice_js",
+      "lifeline_backend_src_services_socketevents_service_js",
+      "mysql_seed",
+      "seedservice_buildseeddata",
+      "seedservice_seeddatabase",
+      "server_start",
+      "socket_getio",
+      "socket_initsocket",
+      "socketevents_service_emitambulancemoved",
+      "socketevents_service_emithospitalupdate",
+      "socketevents_service_emitincidentstatusupdate",
+      "socketevents_service_emitnewincident",
+      "src_pages_hospitaldashboard_tsx"
+    ],
+    "3": [
+      "lifeline_backend_src_db_mongo_js",
+      "mongo_connect",
+      "mongo_createemergency",
+      "mongo_createuser",
+      "mongo_disconnect",
+      "mongo_finduserbyemail",
+      "mongo_finduserbyid",
+      "mongo_getambulancebyid",
+      "mongo_getemergencybyid",
+      "mongo_gethospitalbyid",
+      "mongo_listambulances",
+      "mongo_listemergencies",
+      "mongo_listhospitals",
+      "mongo_normalize",
+      "mongo_seed",
+      "mongo_updateambulance",
+      "mongo_updateemergency",
+      "mongo_updatehospitalbeds"
+    ],
+    "4": [
+      "dispatchservice_enrichemergency",
+      "lifeline_backend_src_db_mysql_js",
+      "mysql_connect",
+      "mysql_createemergency",
+      "mysql_createuser",
+      "mysql_disconnect",
+      "mysql_finduserbyemail",
+      "mysql_finduserbyid",
+      "mysql_getambulancebyid",
+      "mysql_getemergencybyid",
+      "mysql_gethospitalbyid",
+      "mysql_listemergencies",
+      "mysql_maprow",
+      "mysql_migrate",
+      "mysql_updateambulance",
+      "mysql_updateemergency",
+      "mysql_updatehospitalbeds"
+    ],
+    "5": [
+      "graph_firebase_js_node",
+      "implementation_checklist_realtime_tracking_health",
+      "index_resqroute_ai_platform",
+      "lifeline_backend_readme_adapter_pattern_rationale",
+      "lifeline_backend_readme_database_adapter_architecture",
+      "lifeline_backend_readme_memory_mode_quick_demo",
+      "placeholder_generic_image_stub",
+      "readme_backend_express_jwt_rbac",
+      "readme_frontend_react_vite",
+      "readme_resqroute_monorepo",
+      "robots_allow_all_crawlers",
+      "socket_io_guide_ambulance_moved_event",
+      "socket_io_guide_dashboard_room",
+      "socket_io_guide_update_frequency_tradeoff",
+      "socket_io_guide_update_location_endpoint",
+      "socket_io_quickstart_driver_dispatcher_dual_browser_test",
+      "socket_io_quickstart_fast_demo_workflow"
+    ],
+    "6": [
+      "dispatchservice_assignresources",
+      "dispatchservice_buildassignmentmeta",
+      "dispatchservice_clamp",
+      "dispatchservice_computeetaseconds",
+      "dispatchservice_gettrafficmultiplier",
+      "dispatchservice_pickbestambulance",
+      "dispatchservice_pickbesthospital",
+      "geo_classifyseverity",
+      "geo_ensureseverity",
+      "geo_haversinedistance",
+      "lifeline_backend_src_services_dispatchservice_js",
+      "lifeline_backend_src_utils_geo_js",
+      "mysql_listambulances",
+      "mysql_listhospitals"
+    ],
+    "7": [
+      "src_components_ui_toaster_tsx",
+      "src_hooks_use_toast_ts",
+      "toaster_toaster",
+      "use_toast_addtoremovequeue",
+      "use_toast_dispatch",
+      "use_toast_genid",
+      "use_toast_reducer",
+      "use_toast_toast",
+      "use_toast_usetoast"
+    ],
+    "8": [
+      "app_protectedroute",
+      "authcontext_useauth",
+      "login_login",
+      "src_app_tsx",
+      "src_context_authcontext_tsx",
+      "src_main_tsx",
+      "src_pages_login_tsx"
+    ],
+    "9": [
+      "pagination_pagination",
+      "pagination_paginationellipsis",
+      "pagination_paginationlink",
+      "pagination_paginationnext",
+      "pagination_paginationprevious",
+      "src_components_ui_pagination_tsx"
+    ],
+    "10": [
+      "drawer_drawer",
+      "drawer_drawerfooter",
+      "drawer_drawerheader",
+      "src_components_ui_drawer_tsx"
+    ],
+    "11": [
+      "sidebar_cn",
+      "sidebar_handlekeydown",
+      "sidebar_usesidebar",
+      "src_components_ui_sidebar_tsx"
+    ],
+    "12": [
+      "src_hooks_use_location_tracking_ts",
+      "src_hooks_use_socket_ts",
+      "use_location_tracking_uselocationtracking",
+      "use_socket_usesocket"
+    ],
+    "13": [
+      "adminauth_handlegoogleauth",
+      "adminwhitelist_isadminemail",
+      "src_lib_adminwhitelist_ts",
+      "src_pages_adminauth_tsx"
+    ],
+    "14": [
+      "auth_authenticate",
+      "auth_authorize",
+      "lifeline_backend_src_middleware_auth_js"
+    ],
+    "15": [
+      "error_errorhandler",
+      "error_notfound",
+      "lifeline_backend_src_middleware_error_js"
+    ],
+    "16": [
+      "lifeline_backend_src_middleware_sanitize_js",
+      "sanitize_sanitizeobject",
+      "sanitize_sanitizerequest"
+    ],
+    "17": [
+      "breadcrumb_breadcrumbellipsis",
+      "breadcrumb_breadcrumbseparator",
+      "src_components_ui_breadcrumb_tsx"
+    ],
+    "18": [
+      "roleselect_cycleincident",
+      "roleselect_replayanimation",
+      "src_pages_roleselect_tsx"
+    ],
+    "19": [
+      "implementation_checklist_driver_gps_flow",
+      "implementation_checklist_https_geolocation_requirement",
+      "implementation_checklist_socketio_broadcast"
+    ],
+    "20": [
+      "lifeline_backend_src_middleware_validate_js",
+      "validate_validate"
+    ],
+    "21": [
+      "admin_routes_getwindowstart",
+      "lifeline_backend_src_routes_admin_routes_js"
+    ],
+    "22": [
+      "asynchandler_asynchandler",
+      "lifeline_backend_src_utils_asynchandler_js"
+    ],
+    "23": [
+      "calendar_calendar",
+      "src_components_ui_calendar_tsx"
+    ],
+    "24": [
+      "carousel_usecarousel",
+      "src_components_ui_carousel_tsx"
+    ],
+    "25": [
+      "chart_usechart",
+      "src_components_ui_chart_tsx"
+    ],
+    "26": [
+      "form_useformfield",
+      "src_components_ui_form_tsx"
+    ],
+    "27": [
+      "resizable_resizablepanelgroup",
+      "src_components_ui_resizable_tsx"
+    ],
+    "28": [
+      "sonner_toaster",
+      "src_components_ui_sonner_tsx"
+    ],
+    "29": [
+      "src_hooks_use_mobile_tsx",
+      "use_mobile_useismobile"
+    ],
+    "30": [
+      "src_lib_utils_ts",
+      "utils_cn"
+    ],
+    "31": [
+      "admindashboard_handlelogout",
+      "src_pages_admindashboard_tsx"
+    ],
+    "32": [
+      "ambulancedriverdashboard_handlelogout",
+      "src_pages_ambulancedriverdashboard_tsx"
+    ],
+    "33": [
+      "notfound_notfound",
+      "src_pages_notfound_tsx"
+    ],
+    "34": [
+      "eslint_config_js"
+    ],
+    "35": [
+      "postcss_config_js"
+    ],
+    "36": [
+      "tailwind_config_ts"
+    ],
+    "37": [
+      "vite_config_ts"
+    ],
+    "38": [
+      "vitest_config_ts"
+    ],
+    "39": [
+      "lifeline_backend_server_js"
+    ],
+    "40": [
+      "lifeline_backend_src_app_js"
+    ],
+    "41": [
+      "lifeline_backend_src_config_constants_js"
+    ],
+    "42": [
+      "lifeline_backend_src_config_env_js"
+    ],
+    "43": [
+      "lifeline_backend_src_db_index_js"
+    ],
+    "44": [
+      "lifeline_backend_src_routes_ambulance_routes_js"
+    ],
+    "45": [
+      "lifeline_backend_src_routes_auth_routes_js"
+    ],
+    "46": [
+      "lifeline_backend_src_routes_health_routes_js"
+    ],
+    "47": [
+      "lifeline_backend_src_routes_hospital_routes_js"
+    ],
+    "48": [
+      "src_firebase_js"
+    ],
+    "49": [
+      "src_vite_env_d_ts"
+    ],
+    "50": [
+      "src_components_emergencymap_tsx"
+    ],
+    "51": [
+      "src_components_navlink_tsx"
+    ],
+    "52": [
+      "src_components_realtimeemergencymap_tsx"
+    ],
+    "53": [
+      "src_components_ui_accordion_tsx"
+    ],
+    "54": [
+      "src_components_ui_alert_dialog_tsx"
+    ],
+    "55": [
+      "src_components_ui_alert_tsx"
+    ],
+    "56": [
+      "src_components_ui_aspect_ratio_tsx"
+    ],
+    "57": [
+      "src_components_ui_avatar_tsx"
+    ],
+    "58": [
+      "src_components_ui_badge_tsx"
+    ],
+    "59": [
+      "src_components_ui_button_tsx"
+    ],
+    "60": [
+      "src_components_ui_card_tsx"
+    ],
+    "61": [
+      "src_components_ui_checkbox_tsx"
+    ],
+    "62": [
+      "src_components_ui_collapsible_tsx"
+    ],
+    "63": [
+      "src_components_ui_command_tsx"
+    ],
+    "64": [
+      "src_components_ui_context_menu_tsx"
+    ],
+    "65": [
+      "src_components_ui_dialog_tsx"
+    ],
+    "66": [
+      "src_components_ui_dropdown_menu_tsx"
+    ],
+    "67": [
+      "src_components_ui_hover_card_tsx"
+    ],
+    "68": [
+      "src_components_ui_input_otp_tsx"
+    ],
+    "69": [
+      "src_components_ui_input_tsx"
+    ],
+    "70": [
+      "src_components_ui_label_tsx"
+    ],
+    "71": [
+      "src_components_ui_menubar_tsx"
+    ],
+    "72": [
+      "src_components_ui_navigation_menu_tsx"
+    ],
+    "73": [
+      "src_components_ui_popover_tsx"
+    ],
+    "74": [
+      "src_components_ui_progress_tsx"
+    ],
+    "75": [
+      "src_components_ui_radio_group_tsx"
+    ],
+    "76": [
+      "src_components_ui_scroll_area_tsx"
+    ],
+    "77": [
+      "src_components_ui_select_tsx"
+    ],
+    "78": [
+      "src_components_ui_separator_tsx"
+    ],
+    "79": [
+      "src_components_ui_sheet_tsx"
+    ],
+    "80": [
+      "src_components_ui_skeleton_tsx"
+    ],
+    "81": [
+      "src_components_ui_slider_tsx"
+    ],
+    "82": [
+      "src_components_ui_switch_tsx"
+    ],
+    "83": [
+      "src_components_ui_table_tsx"
+    ],
+    "84": [
+      "src_components_ui_tabs_tsx"
+    ],
+    "85": [
+      "src_components_ui_textarea_tsx"
+    ],
+    "86": [
+      "src_components_ui_toast_tsx"
+    ],
+    "87": [
+      "src_components_ui_toggle_group_tsx"
+    ],
+    "88": [
+      "src_components_ui_toggle_tsx"
+    ],
+    "89": [
+      "src_components_ui_tooltip_tsx"
+    ],
+    "90": [
+      "src_components_ui_use_toast_ts"
+    ],
+    "91": [
+      "src_data_types_ts"
+    ],
+    "92": [
+      "src_lib_firebase_ts"
+    ],
+    "93": [
+      "src_pages_index_tsx"
+    ],
+    "94": [
+      "src_test_example_test_ts"
+    ],
+    "95": [
+      "src_test_setup_ts"
+    ]
+  },
+  "cohesion": {},
+  "god_nodes": [
+    {
+      "id": "memory_now",
+      "label": "now()",
+      "degree": 11
+    },
+    {
+      "id": "memory_clone",
+      "label": "clone()",
+      "degree": 11
+    },
+    {
+      "id": "mongo_normalize",
+      "label": "normalize()",
+      "degree": 11
+    },
+    {
+      "id": "dispatchservice_assignresources",
+      "label": "assignResources()",
+      "degree": 7
+    },
+    {
+      "id": "mysql_maprow",
+      "label": "mapRow()",
+      "degree": 6
+    },
+    {
+      "id": "server_start",
+      "label": "start()",
+      "degree": 5
+    },
+    {
+      "id": "socket_getio",
+      "label": "getIO()",
+      "degree": 5
+    },
+    {
+      "id": "mockdata_haversinedistance",
+      "label": "haversineDistance()",
+      "degree": 5
+    },
+    {
+      "id": "userdashboard_createemergency",
+      "label": "createEmergency()",
+      "degree": 5
+    },
+    {
+      "id": "memory_clonelist",
+      "label": "cloneList()",
+      "degree": 4
+    }
+  ],
+  "surprises": [
+    {
+      "source": "firebase.js Graph Node Visual",
+      "target": "React Vite Frontend Application",
+      "source_files": [
+        "graph.png",
+        "README.md"
+      ],
+      "confidence": "AMBIGUOUS",
+      "relation": "references",
+      "why": "ambiguous connection - not explicitly stated in source; crosses file types (doc \u2194 image); connects across different repos/directories"
+    },
+    {
+      "source": "Generic Image Placeholder Asset",
+      "target": "ResQRoute AI Emergency Response Platform",
+      "source_files": [
+        "public/placeholder.svg",
+        "index.html"
+      ],
+      "confidence": "INFERRED",
+      "relation": "conceptually_related_to",
+      "why": "inferred connection - not explicitly stated in source; crosses file types (doc \u2194 image); connects across different repos/directories"
+    },
+    {
+      "source": "Socket.io Fast Demo Workflow",
+      "target": "Memory Mode for Zero-Setup Demo",
+      "source_files": [
+        "SOCKET_IO_QUICKSTART.md",
+        "lifeline-backend/README.md"
+      ],
+      "confidence": "INFERRED",
+      "relation": "semantically_similar_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; semantically similar concepts with no structural link"
+    },
+    {
+      "source": "start()",
+      "target": "connect()",
+      "source_files": [
+        "lifeline-backend\\src\\server.js",
+        "lifeline-backend\\src\\db\\mysql.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "start()",
+      "target": "initSocket()",
+      "source_files": [
+        "lifeline-backend\\src\\server.js",
+        "lifeline-backend\\src\\config\\socket.js"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `initSocket()` unexpectedly reaches hub `start()`"
+    }
+  ]
+}

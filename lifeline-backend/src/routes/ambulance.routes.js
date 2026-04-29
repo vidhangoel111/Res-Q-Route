@@ -5,12 +5,22 @@ const { USER_ROLES, AMBULANCE_STATUS } = require("../config/constants");
 const { authenticate, authorize } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 const { asyncHandler } = require("../utils/asyncHandler");
+const { emitAmbulanceMoved } = require("../services/socketEvents.service");
 
 const router = express.Router();
 
 const updateStatusSchema = z.object({
   body: z.object({
     status: z.enum([AMBULANCE_STATUS.AVAILABLE, AMBULANCE_STATUS.BUSY, AMBULANCE_STATUS.MAINTENANCE]),
+  }),
+  params: z.object({ id: z.string().min(1) }),
+  query: z.object({}),
+});
+
+const updateLocationSchema = z.object({
+  body: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
   }),
   params: z.object({ id: z.string().min(1) }),
   query: z.object({}),
@@ -53,6 +63,29 @@ router.patch(
     }
 
     const updated = await db.updateAmbulance(id, { status: req.validated.body.status });
+    res.json(updated);
+  })
+);
+
+// Update ambulance location in real-time
+router.patch(
+  "/:id/location",
+  authenticate,
+  validate(updateLocationSchema),
+  asyncHandler(async (req, res) => {
+    const id = req.validated.params.id;
+    const { lat, lng } = req.validated.body;
+
+    const ambulance = await db.getAmbulanceById(id);
+    if (!ambulance) {
+      return res.status(404).json({ message: "Ambulance not found" });
+    }
+
+    const updated = await db.updateAmbulance(id, { lat, lng });
+    
+    // Broadcast location update to all connected clients
+    emitAmbulanceMoved(id, lat, lng);
+
     res.json(updated);
   })
 );

@@ -7,6 +7,7 @@ interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  hospitalId?: string | null;
   photoURL?: string;
 }
 
@@ -33,7 +34,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback((email: string, _password: string, role: UserRole) => {
     const namePart = email.split("@")[0].replace(/[._]/g, " ");
     const displayName = namePart.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-    const authUser: AuthUser = { id: `${role[0]}1`, name: displayName, email, role };
+    const authUser: AuthUser = {
+      id: `${role[0]}1`,
+      name: displayName,
+      email,
+      role,
+      hospitalId: role === "hospital" ? "h1" : null,
+    };
     setUser(authUser);
     localStorage.setItem("resqroute_user", JSON.stringify(authUser));
     return true;

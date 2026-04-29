@@ -5,6 +5,7 @@ const store = {
   hospitals: [],
   ambulances: [],
   emergencies: [],
+  hospitalHistory: [],
 };
 
 function now() {
@@ -29,6 +30,10 @@ function cloneList(records) {
   return records.map((record) => ({ ...record }));
 }
 
+function sortByCreatedAtDesc(records) {
+  return [...records].sort((a, b) => new Date(b.createdAt || b.created_at || Date.now()).getTime() - new Date(a.createdAt || a.created_at || Date.now()).getTime());
+}
+
 async function connect() {
   return Promise.resolve();
 }
@@ -51,6 +56,10 @@ async function findUserByEmail(email) {
 
 async function findUserById(id) {
   return clone(store.users.find((user) => user.id === id));
+}
+
+async function listUsers() {
+  return cloneList(sortByCreatedAtDesc(store.users));
 }
 
 async function createUser(payload) {
@@ -82,6 +91,36 @@ async function updateHospitalBeds(id, updates) {
 
   Object.assign(hospital, updates, { updatedAt: now() });
   return clone(hospital);
+}
+
+async function createHospitalHistory(payload) {
+  const timestamp = now();
+  const entry = {
+    id: payload.id || randomUUID(),
+    hospitalId: payload.hospitalId || null,
+    hospitalName: payload.hospitalName || null,
+    action: payload.action,
+    details: payload.details || "",
+    actorUserId: payload.actorUserId || null,
+    actorName: payload.actorName || null,
+    source: payload.source || "admin",
+    emergencyId: payload.emergencyId || null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  store.hospitalHistory.push(entry);
+  return clone(entry);
+}
+
+async function listHospitalHistory(filters = {}) {
+  const history = store.hospitalHistory.filter((entry) => {
+    if (filters.hospitalId && entry.hospitalId !== filters.hospitalId) return false;
+    if (filters.source && entry.source !== filters.source) return false;
+    return true;
+  });
+
+  return cloneList(sortByCreatedAtDesc(history));
 }
 
 async function listAmbulances(filters = {}) {
@@ -156,10 +195,13 @@ module.exports = {
   seed,
   findUserByEmail,
   findUserById,
+  listUsers,
   createUser,
   listHospitals,
   getHospitalById,
   updateHospitalBeds,
+  createHospitalHistory,
+  listHospitalHistory,
   listAmbulances,
   getAmbulanceById,
   updateAmbulance,

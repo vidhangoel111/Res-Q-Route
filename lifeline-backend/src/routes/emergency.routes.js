@@ -7,6 +7,7 @@ const { authenticate, authorize } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { assignResources, enrichEmergency } = require("../services/dispatchService");
+const { haversineDistance } = require("../utils/geo");
 
 const router = express.Router();
 
@@ -40,6 +41,48 @@ const updateStatusSchema = z.object({
   query: z.object({}),
 });
 
+const simulateSchema = z.object({
+  body: z.object({
+    type: z.string().min(2),
+    description: z.string().min(5),
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+    severity: z.enum(["critical", "high", "medium", "low"]).optional(),
+  }),
+  params: z.object({}),
+  query: z.object({}),
+});
+
+function isLikelyDuplicate(existing, incoming) {
+  const createdAt = new Date(existing.createdAt || existing.created_at || Date.now());
+  const ageMs = Date.now() - createdAt.getTime();
+  const withinCooldown = ageMs >= 0 && ageMs <= 120000;
+  if (!withinCooldown) return false;
+
+  const sameType = (existing.type || "").toLowerCase() === (incoming.type || "").toLowerCase();
+  const samePhone = (existing.phone || "") === (incoming.phone || "");
+  const distanceKm = haversineDistance(incoming.lat, incoming.lng, existing.lat, existing.lng);
+  return sameType && samePhone && distanceKm <= 0.35;
+}
+
+router.post(
+  "/simulate",
+  authenticate,
+  authorize(USER_ROLES.USER, USER_ROLES.HOSPITAL, USER_ROLES.ADMIN),
+  validate(simulateSchema),
+  asyncHandler(async (req, res) => {
+    const payload = req.validated.body;
+    const assignment = await assignResources(payload);
+
+    res.json({
+      mode: "simulation",
+      input: payload,
+      assignment,
+      message: "Simulation completed. No emergency record was created.",
+    });
+  })
+);
+
 router.post(
   "/",
   authenticate,
@@ -47,6 +90,18 @@ router.post(
   validate(createEmergencySchema),
   asyncHandler(async (req, res) => {
     const payload = req.validated.body;
+
+    const recentEmergencies = await db.listEmergencies({ createdByUserId: req.user.sub });
+    const duplicate = recentEmergencies.find((item) => isLikelyDuplicate(item, payload));
+    if (duplicate) {
+      const existing = await enrichEmergency(duplicate);
+      return res.status(202).json({
+        ...existing,
+        duplicate: true,
+        message: "Similar emergency already created in the last 2 minutes. Reusing existing request.",
+      });
+    }
+
     const assignment = await assignResources(payload);
 
     const emergency = await db.createEmergency({
@@ -69,8 +124,30 @@ router.post(
       await db.updateAmbulance(assignment.assignedAmbulanceId, { status: AMBULANCE_STATUS.BUSY });
     }
 
+    if (assignment.assignedHospitalId) {
+      const hospital = await db.getHospitalById(assignment.assignedHospitalId);
+      await db.createHospitalHistory({
+        hospitalId: assignment.assignedHospitalId,
+        hospitalName: hospital?.name || null,
+        action: "EMERGENCY_CREATED",
+        details: `Emergency ${emergency.id} created for ${payload.patientName} with severity ${assignment.severity}.`,
+        actorUserId: req.user.sub,
+        actorName: req.user.name,
+        source: "emergency",
+        emergencyId: emergency.id,
+      });
+    }
+
     const enriched = await enrichEmergency(emergency);
-    res.status(201).json(enriched);
+    res.status(201).json({
+      ...enriched,
+      assignmentMeta: {
+        confidence: assignment.assignmentConfidence,
+        reasons: assignment.assignmentReasons,
+        ambulanceCandidates: assignment.ambulanceCandidates,
+        hospitalCandidates: assignment.hospitalCandidates,
+      },
+    });
   })
 );
 
@@ -140,6 +217,20 @@ router.patch(
       if (emergency.assignedAmbulanceId) {
         await db.updateAmbulance(emergency.assignedAmbulanceId, { status: AMBULANCE_STATUS.AVAILABLE });
       }
+
+      if (emergency.assignedHospitalId) {
+        const hospital = await db.getHospitalById(emergency.assignedHospitalId);
+        await db.createHospitalHistory({
+          hospitalId: emergency.assignedHospitalId,
+          hospitalName: hospital?.name || null,
+          action: "EMERGENCY_COMPLETED",
+          details: `Emergency ${emergency.id} marked completed for ${emergency.patientName}.`,
+          actorUserId: req.user.sub,
+          actorName: req.user.name,
+          source: "emergency",
+          emergencyId: emergency.id,
+        });
+      }
     }
 
     const updated = await db.updateEmergency(emergency.id, updates);
@@ -175,8 +266,30 @@ router.post(
       await db.updateAmbulance(assignment.assignedAmbulanceId, { status: AMBULANCE_STATUS.BUSY });
     }
 
+    if (assignment.assignedHospitalId) {
+      const hospital = await db.getHospitalById(assignment.assignedHospitalId);
+      await db.createHospitalHistory({
+        hospitalId: assignment.assignedHospitalId,
+        hospitalName: hospital?.name || null,
+        action: "EMERGENCY_ASSIGNED",
+        details: `Emergency ${updated.id} assigned to ${hospital?.name || assignment.assignedHospitalId} with ETA ${assignment.etaSeconds ?? 0}s.`,
+        actorUserId: req.user.sub,
+        actorName: req.user.name,
+        source: "emergency",
+        emergencyId: updated.id,
+      });
+    }
+
     const enriched = await enrichEmergency(updated);
-    res.json(enriched);
+    res.json({
+      ...enriched,
+      assignmentMeta: {
+        confidence: assignment.assignmentConfidence,
+        reasons: assignment.assignmentReasons,
+        ambulanceCandidates: assignment.ambulanceCandidates,
+        hospitalCandidates: assignment.hospitalCandidates,
+      },
+    });
   })
 );
 
