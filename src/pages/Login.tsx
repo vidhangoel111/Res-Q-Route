@@ -8,7 +8,7 @@ const roleLabels: Record<string, string> = { user: "User", hospital: "Hospital",
 const Login = () => {
   const { role } = useParams<{ role: string }>();
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -16,8 +16,8 @@ const Login = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) { setError("Please enter email and password"); return; }
-    const success = login(email, password, validRole);
+    if (!identifier || !password) { setError("Please enter phone/email and password"); return; }
+    const success = login(identifier, password, validRole);
     if (success) {
       window.location.href = `/dashboard/${validRole}`;
     } else {
@@ -45,8 +45,8 @@ const Login = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="text-sm font-medium text-foreground">Email</label>
-              <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={`${validRole}@resqroute.in`}
+              <label htmlFor="identifier" className="text-sm font-medium text-foreground">Phone/Email</label>
+              <input id="identifier" type="text" value={identifier} onChange={e => setIdentifier(e.target.value)} placeholder={`Phone or ${validRole}@resqroute.in`}
                 className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
             </div>
             <div>
@@ -58,7 +58,7 @@ const Login = () => {
             <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">
               <LogIn className="w-4 h-4" /> Sign In
             </button>
-            <p className="text-xs text-center text-muted-foreground">Demo: Enter any email & password</p>
+            <p className="text-xs text-center text-muted-foreground">Demo: Enter any phone/email & password</p>
           </form>
         </div>
       </div>

@@ -57,6 +57,47 @@ ResQRoute simulates and supports emergency workflow optimization:
 	- MySQL
 - Seed service for demo data/users
 
+## Core Features
+
+This section summarizes the repository's core capabilities based on the code and how to run it locally.
+
+- **Frontend (React + Vite):** Role-based UI for `user`, `hospital`, and `admin` with protected routes, emergency request forms, map integration (React Leaflet), location search hooks, analytics views, and a Tailwind + shadcn/ui component system.
+- **Backend (lifeline-backend):** Express API mounted under `/api` providing health, auth, emergency, hospital, ambulance, admin, and location endpoints; JWT auth and RBAC; Zod validation; security hardening (helmet, rate limiting, HPP, sanitization); and a seed service for demo data. The backend supports MongoDB (mongoose) or MySQL (mysql2) via `DB_PROVIDER`.
+- **Dispatch & Selection Logic:** Ambulance and hospital selection logic that factors distance and availability when assigning resources to emergencies (see `lifeline-backend/src/services` and route handlers under `lifeline-backend/src/routes`).
+- **Geocoding & Maps:** Location geocode and reverse-geocode endpoints used by the frontend search hooks and the map UI to convert between addresses and coordinates.
+- **Dev/Monorepo Convenience:** Frontend at the repo root and backend under `lifeline-backend`; scripts and env templates provided to run both services concurrently in development.
+
+### Quick run (local development)
+
+1. Install frontend deps from repo root:
+
+	npm install
+
+2. Install backend deps and configure env:
+
+	cd lifeline-backend
+	npm install
+	copy .env.example .env  (then set `DB_PROVIDER`, DB connection, and `JWT_SECRET`)
+
+3. Start backend (development):
+
+	npm run dev
+
+4. Start frontend (development) from repo root:
+
+	npm run dev
+
+Both servers run concurrently (frontend defaults to `http://localhost:5173`, backend to `http://localhost:3001`). Use `VITE_API_BASE_URL` to override the API base URL for the frontend.
+
+## Planned Improvements
+
+- **Automated end-to-end tests:** Add Cypress or Playwright flows to simulate user → emergency → dispatch lifecycle.
+- **Improved assignment algorithms:** Introduce weighted scoring (ETA, load, specialty matching) and configurable policies for hospital/ambulance assignment.
+- **Realtime updates:** Use Socket.IO (or WebSocket) integration to push emergency status and ambulance location updates to dashboards.
+- **CLI & tooling for seed data:** Add scripts to seed realistic demo incidents and metrics for testing and demos.
+- **Observability:** Add structured logging and basic metrics (Prometheus + Grafana or similar) for backend health and dispatch performance.
+
+
 ## Tech Stack
 
 ### Frontend

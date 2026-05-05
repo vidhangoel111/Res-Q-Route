@@ -1,10 +1,10 @@
 import { EmergencyRequest, Ambulance, Hospital } from "./types";
 
 export const MOCK_HOSPITALS: Hospital[] = [
-  { id: "h1", name: "City General Hospital", lat: 28.6139, lng: 77.209, icuBeds: 12, emergencyBeds: 24, totalBeds: 200, occupancy: 72 },
-  { id: "h2", name: "Apollo Emergency Center", lat: 28.5672, lng: 77.2100, icuBeds: 8, emergencyBeds: 16, totalBeds: 150, occupancy: 65 },
-  { id: "h3", name: "AIIMS Trauma Centre", lat: 28.5672, lng: 77.2099, icuBeds: 20, emergencyBeds: 40, totalBeds: 500, occupancy: 85 },
-  { id: "h4", name: "Max Super Speciality", lat: 28.6304, lng: 77.2177, icuBeds: 15, emergencyBeds: 30, totalBeds: 300, occupancy: 58 },
+  { id: "h1", name: "City General Hospital", lat: 28.6139, lng: 77.209, icuBeds: 12, emergencyBeds: 24, totalBeds: 200, occupancy: 72, capacity: 18, burnUnit: false },
+  { id: "h2", name: "Apollo Emergency Center", lat: 28.5672, lng: 77.2100, icuBeds: 8, emergencyBeds: 16, totalBeds: 150, occupancy: 65, capacity: 14, burnUnit: true },
+  { id: "h3", name: "AIIMS Trauma Centre", lat: 28.5672, lng: 77.2099, icuBeds: 20, emergencyBeds: 40, totalBeds: 500, occupancy: 85, capacity: 28, burnUnit: true },
+  { id: "h4", name: "Max Super Speciality", lat: 28.6304, lng: 77.2177, icuBeds: 15, emergencyBeds: 30, totalBeds: 300, occupancy: 58, capacity: 22, burnUnit: false },
 ];
 
 export const MOCK_AMBULANCES: Ambulance[] = [
@@ -41,28 +41,88 @@ export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function findNearestAmbulance(userLat: number, userLng: number, ambulances: Ambulance[]): Ambulance | null {
-  const available = ambulances.filter(a => a.status === "available");
-  if (!available.length) return null;
-  let best = available[0];
-  let bestDist = haversineDistance(userLat, userLng, best.lat, best.lng);
-  for (const amb of available) {
-    const d = haversineDistance(userLat, userLng, amb.lat, amb.lng);
-    if (d < bestDist) { best = amb; bestDist = d; }
+// Calculate bearing (direction) from point1 to point2
+export function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+  
+  const y = Math.sin(dLon) * Math.cos(lat2Rad);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+  const bearing = Math.atan2(y, x) * 180 / Math.PI;
+  
+  return (bearing + 360) % 360; // Return 0-360 degrees
+}
+
+// Get direction name from bearing
+export function getBearingDirection(bearing: number): string {
+  const directions = ["North", "NNE", "NE", "ENE", "East", "ESE", "SE", "SSE", "South", "SSW", "SW", "WSW", "West", "WNW", "NW", "NNW"];
+  const index = Math.round(bearing / 22.5) % 16;
+  return directions[index];
+}
+
+const AVG_SPEED_KMPH = 40;
+
+function isCardiacEmergency(type: string): boolean {
+  const normalized = type.toLowerCase();
+  return normalized.includes("cardiac") || normalized.includes("heart") || normalized.includes("stroke");
+}
+
+function isBurnEmergency(type: string): boolean {
+  return type.toLowerCase().includes("burn");
+}
+
+function supportsEmergencyType(hospital: Hospital, emergencyType: string): boolean {
+  if (hospital.capacity <= 0) return false;
+  if (isCardiacEmergency(emergencyType) && hospital.icuBeds <= 0) return false;
+  if (isBurnEmergency(emergencyType) && !hospital.burnUnit) return false;
+  return hospital.emergencyBeds > 0 || hospital.icuBeds > 0;
+}
+
+export function estimateTravelTimeSeconds(distanceKm: number, avgSpeedKmph = AVG_SPEED_KMPH): number {
+  if (distanceKm <= 0) return 0;
+  return Math.round((distanceKm / avgSpeedKmph) * 3600);
+}
+
+export function findOptimalDispatch(
+  userLat: number,
+  userLng: number,
+  emergencyType: string,
+  ambulances: Ambulance[],
+  hospitals: Hospital[],
+): { ambulance: Ambulance | null; hospital: Hospital | null; totalEtaSeconds: number } {
+  const availableAmbulances = ambulances.filter((a) => a.status === "available");
+  const eligibleHospitals = hospitals.filter((h) => supportsEmergencyType(h, emergencyType));
+
+  let best: { ambulance: Ambulance | null; hospital: Hospital | null; totalEtaSeconds: number } = {
+    ambulance: null,
+    hospital: null,
+    totalEtaSeconds: 0,
+  };
+
+  for (const ambulance of availableAmbulances) {
+    const toUserDistanceKm = haversineDistance(userLat, userLng, ambulance.lat, ambulance.lng);
+    const toUserSeconds = estimateTravelTimeSeconds(toUserDistanceKm);
+
+    for (const hospital of eligibleHospitals) {
+      const toHospitalDistanceKm = haversineDistance(userLat, userLng, hospital.lat, hospital.lng);
+      const totalEtaSeconds = toUserSeconds + estimateTravelTimeSeconds(toHospitalDistanceKm);
+
+      if (!best.ambulance || totalEtaSeconds < best.totalEtaSeconds) {
+        best = { ambulance, hospital, totalEtaSeconds };
+      }
+    }
   }
+
   return best;
 }
 
-export function findBestHospital(userLat: number, userLng: number, hospitals: Hospital[]): Hospital | null {
-  const withBeds = hospitals.filter(h => h.emergencyBeds > 0 || h.icuBeds > 0);
-  if (!withBeds.length) return null;
-  let best = withBeds[0];
-  let bestScore = haversineDistance(userLat, userLng, best.lat, best.lng) + (best.occupancy / 100);
-  for (const h of withBeds) {
-    const score = haversineDistance(userLat, userLng, h.lat, h.lng) + (h.occupancy / 100);
-    if (score < bestScore) { best = h; bestScore = score; }
-  }
-  return best;
+export function findNearestAmbulance(userLat: number, userLng: number, ambulances: Ambulance[], emergencyType = "general"): Ambulance | null {
+  return findOptimalDispatch(userLat, userLng, emergencyType, ambulances, MOCK_HOSPITALS).ambulance;
+}
+
+export function findBestHospital(userLat: number, userLng: number, hospitals: Hospital[], emergencyType = "general", ambulances: Ambulance[] = MOCK_AMBULANCES): Hospital | null {
+  return findOptimalDispatch(userLat, userLng, emergencyType, ambulances, hospitals).hospital;
 }
 
 export function generateEmergencyId(): string {

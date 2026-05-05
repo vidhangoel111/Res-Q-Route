@@ -2,151 +2,263 @@ const db = require("../db");
 const { AMBULANCE_STATUS } = require("../config/constants");
 const { haversineDistance, classifySeverity, ensureSeverity } = require("../utils/geo");
 
-const TRAFFIC_ZONES = [
-  { bounds: [[28.628, 77.215], [28.637, 77.225]], multiplier: 1.6 },
-  { bounds: [[28.61, 77.225], [28.618, 77.235]], multiplier: 1.3 },
-  { bounds: [[28.645, 77.185], [28.655, 77.2]], multiplier: 1.6 },
-];
-
-function getTrafficMultiplier(lat, lng) {
-  for (const zone of TRAFFIC_ZONES) {
-    const [[minLat, minLng], [maxLat, maxLng]] = zone.bounds;
-    if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
-      return zone.multiplier;
-    }
-  }
-  return 1;
-}
+const AVG_AMBULANCE_SPEED_KMPH = 40;
+const CARDIAC_TYPES = ["cardiac", "heart", "stroke"];
+const BURN_TYPES = ["burn"];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function computeEtaSeconds(distanceKm, severity, trafficMultiplier = 1) {
-  const baseSpeedKmph = severity === "critical" ? 45 : 35;
-  const trafficPenalty = Math.max(1, trafficMultiplier);
-  const etaHours = (distanceKm * trafficPenalty) / Math.max(baseSpeedKmph, 10);
-  return Math.max(Math.round(etaHours * 3600), 120);
+function computeTravelSeconds(distanceKm, avgSpeedKmph = AVG_AMBULANCE_SPEED_KMPH) {
+  if (distanceKm <= 0) return 0;
+  const etaHours = distanceKm / Math.max(avgSpeedKmph, 1);
+  return Math.round(etaHours * 3600);
 }
 
-async function pickBestAmbulance(lat, lng) {
-  const ambulances = await db.listAmbulances({ status: AMBULANCE_STATUS.AVAILABLE });
-  if (ambulances.length === 0) {
-    return { best: null, ranked: [] };
-  }
-
-  const ranked = ambulances
-    .map((ambulance) => ({
-      ambulance,
-      distanceKm: haversineDistance(lat, lng, ambulance.lat, ambulance.lng),
-      trafficMultiplier: getTrafficMultiplier(ambulance.lat, ambulance.lng),
-      score: 0,
-    }))
-    .map((item) => ({
-      ...item,
-      score: item.distanceKm * item.trafficMultiplier,
-    }))
-    .sort((a, b) => a.score - b.score || a.distanceKm - b.distanceKm);
-
-  return { best: ranked[0], ranked };
+function normalizeEmergencyType(type = "") {
+  return type.trim().toLowerCase();
 }
 
-async function pickBestHospital(lat, lng, severity) {
-  const hospitals = await db.listHospitals();
-  const eligible = hospitals.filter((hospital) => hospital.icuBeds > 0 || hospital.emergencyBeds > 0);
-
-  if (eligible.length === 0) {
-    return { best: null, ranked: [] };
+function getHospitalCapacity(hospital) {
+  if (typeof hospital.capacity === "number") {
+    return hospital.capacity;
   }
 
-  const ranked = eligible
-    .map((hospital) => {
-      const distanceKm = haversineDistance(lat, lng, hospital.lat, hospital.lng);
-      const icuBonus = severity === "critical" ? Math.min(hospital.icuBeds || 0, 5) * 0.1 : 0;
-      const score = distanceKm + hospital.occupancy / 100 - icuBonus;
-      return { hospital, distanceKm, score };
-    })
-    .sort((a, b) => a.score - b.score);
-
-  return { best: ranked[0], ranked };
+  return (hospital.icuBeds || 0) + (hospital.emergencyBeds || 0);
 }
 
-function buildAssignmentMeta({ severity, ambulanceBest, hospitalBest, ambulanceRanked, hospitalRanked }) {
-  const ambulanceFactor = ambulanceBest ? clamp(1 - ambulanceBest.score / 25, 0, 1) : 0;
-  const hospitalFactor = hospitalBest ? clamp(1 - hospitalBest.score / 20, 0, 1) : 0;
-  const severityFactor = severity === "critical" ? 1 : severity === "high" ? 0.85 : severity === "medium" ? 0.75 : 0.65;
-  const confidence = Math.round((ambulanceFactor * 0.45 + hospitalFactor * 0.35 + severityFactor * 0.2) * 100);
+function getHospitalRequirements(type) {
+  const normalizedType = normalizeEmergencyType(type);
+  const requirements = [];
 
-  const reasons = [];
-  if (ambulanceBest) {
-    reasons.push(
-      `Nearest available ambulance at ${ambulanceBest.distanceKm.toFixed(2)} km with traffic factor x${ambulanceBest.trafficMultiplier.toFixed(1)}`
-    );
-  } else {
-    reasons.push("No available ambulance found; assignment deferred");
+  if (CARDIAC_TYPES.some((token) => normalizedType.includes(token))) {
+    requirements.push({
+      key: "icu",
+      description: "Cardiac emergency requires ICU availability",
+      check: (hospital) => (hospital.icuBeds || 0) > 0,
+    });
   }
 
-  if (hospitalBest) {
-    reasons.push(
-      `Hospital optimized by distance and occupancy (${hospitalBest.hospital.occupancy}% occupied)`
-    );
-    if (severity === "critical") {
-      reasons.push("Critical severity gave extra priority to ICU bed availability");
+  if (BURN_TYPES.some((token) => normalizedType.includes(token))) {
+    requirements.push({
+      key: "burnUnit",
+      description: "Burn emergency requires burn unit support",
+      check: (hospital) => hospital.burnUnit === true,
+    });
+  }
+
+  return requirements;
+}
+
+function evaluateHospitalEligibility(hospital, emergencyType) {
+  const requirements = getHospitalRequirements(emergencyType);
+  const capacity = getHospitalCapacity(hospital);
+  const failures = [];
+
+  if (capacity <= 0) {
+    failures.push("No remaining capacity");
+  }
+
+  for (const requirement of requirements) {
+    if (!requirement.check(hospital)) {
+      failures.push(requirement.description);
     }
-  } else {
-    reasons.push("No eligible hospital with emergency/ICU bed available");
   }
+
+  return {
+    isEligible: failures.length === 0,
+    failures,
+    capacity,
+    requirements: requirements.map((item) => item.description),
+  };
+}
+
+function buildDecisionExplanation({ emergencyType, severity, availableAmbulances, eligibleHospitals, rejectedHospitals, rankedPairs, selectedPair }) {
+  const selected = selectedPair
+    ? {
+        ambulanceId: selectedPair.ambulance.id,
+        ambulanceVehicleNo: selectedPair.ambulance.vehicleNo,
+        hospitalId: selectedPair.hospital.id,
+        hospitalName: selectedPair.hospital.name,
+        ambulanceToUserDistanceKm: Number(selectedPair.ambulanceToUserDistanceKm.toFixed(2)),
+        ambulanceToUserSeconds: selectedPair.ambulanceToUserSeconds,
+        userToHospitalDistanceKm: Number(selectedPair.userToHospitalDistanceKm.toFixed(2)),
+        userToHospitalSeconds: selectedPair.userToHospitalSeconds,
+        totalDistanceKm: Number(selectedPair.totalDistanceKm.toFixed(2)),
+        totalEtaSeconds: selectedPair.totalEtaSeconds,
+      }
+    : null;
+
+  const rationale = [];
+  if (!selectedPair) {
+    rationale.push("No valid ambulance and hospital combination met the availability and treatment rules.");
+  } else {
+    rationale.push("Selected the ambulance-hospital pair with the minimum total travel time.");
+    rationale.push(`Ambulance ${selectedPair.ambulance.vehicleNo} reaches the user in ${Math.max(1, Math.round(selectedPair.ambulanceToUserSeconds / 60))} min.`);
+    rationale.push(`Hospital ${selectedPair.hospital.name} adds ${Math.max(1, Math.round(selectedPair.userToHospitalSeconds / 60))} min transport time and has capacity ${selectedPair.capacity}.`);
+  }
+
+  return {
+    strategy: "minimum_total_time",
+    averageSpeedKmph: AVG_AMBULANCE_SPEED_KMPH,
+    emergencyType,
+    severity,
+    filtersApplied: {
+      ambulanceStatus: [AMBULANCE_STATUS.FREE],
+      hospitalRequirements: getHospitalRequirements(emergencyType).map((item) => item.description),
+      requireCapacity: true,
+    },
+    consideredCounts: {
+      availableAmbulances: availableAmbulances.length,
+      eligibleHospitals: eligibleHospitals.length,
+      rejectedHospitals: rejectedHospitals.length,
+      combinationsEvaluated: rankedPairs.length,
+    },
+    selected,
+    rationale,
+    rejectedHospitals: rejectedHospitals.map((item) => ({
+      id: item.hospital.id,
+      name: item.hospital.name,
+      reasons: item.failures,
+    })),
+    alternatives: rankedPairs.slice(0, 3).map((item) => ({
+      ambulanceId: item.ambulance.id,
+      ambulanceVehicleNo: item.ambulance.vehicleNo,
+      hospitalId: item.hospital.id,
+      hospitalName: item.hospital.name,
+      totalEtaSeconds: item.totalEtaSeconds,
+      totalDistanceKm: Number(item.totalDistanceKm.toFixed(2)),
+    })),
+  };
+}
+
+function buildAssignmentMeta({ severity, availableAmbulances, eligibleHospitals, rankedPairs, selectedPair, decisionExplanation }) {
+  const totalTravelFactor = selectedPair ? clamp(1 - selectedPair.totalDistanceKm / 30, 0, 1) : 0;
+  const capacityFactor = selectedPair ? clamp(selectedPair.capacity / 50, 0, 1) : 0;
+  const severityFactor = severity === "critical" ? 1 : severity === "high" ? 0.85 : severity === "medium" ? 0.75 : 0.65;
+  const confidence = Math.round((totalTravelFactor * 0.5 + capacityFactor * 0.25 + severityFactor * 0.25) * 100);
+
+  const reasons = decisionExplanation.rationale;
 
   return {
     assignmentConfidence: confidence,
     assignmentReasons: reasons,
-    ambulanceCandidates: ambulanceRanked.slice(0, 3).map((item) => ({
+    ambulanceCandidates: availableAmbulances.slice(0, 3).map((item) => ({
       id: item.ambulance.id,
       vehicleNo: item.ambulance.vehicleNo,
-      distanceKm: Number(item.distanceKm.toFixed(2)),
-      trafficMultiplier: Number(item.trafficMultiplier.toFixed(1)),
-      score: Number(item.score.toFixed(2)),
+      distanceKm: Number(item.ambulanceToUserDistanceKm.toFixed(2)),
+      etaSeconds: item.ambulanceToUserSeconds,
+      status: item.ambulance.status,
     })),
-    hospitalCandidates: hospitalRanked.slice(0, 3).map((item) => ({
+    hospitalCandidates: eligibleHospitals.slice(0, 3).map((item) => ({
       id: item.hospital.id,
       name: item.hospital.name,
-      distanceKm: Number(item.distanceKm.toFixed(2)),
-      occupancy: item.hospital.occupancy,
-      score: Number(item.score.toFixed(2)),
+      distanceKm: Number(item.userToHospitalDistanceKm.toFixed(2)),
+      etaSeconds: item.userToHospitalSeconds,
+      capacity: item.capacity,
+      burnUnit: Boolean(item.hospital.burnUnit),
       icuBeds: item.hospital.icuBeds,
       emergencyBeds: item.hospital.emergencyBeds,
+    })),
+    combinationCandidates: rankedPairs.slice(0, 3).map((item) => ({
+      ambulanceId: item.ambulance.id,
+      hospitalId: item.hospital.id,
+      totalEtaSeconds: item.totalEtaSeconds,
+      totalDistanceKm: Number(item.totalDistanceKm.toFixed(2)),
     })),
   };
 }
 
 async function assignResources({ lat, lng, type, description, severity }) {
   const normalizedSeverity = ensureSeverity(severity || classifySeverity(type, description));
-  const ambulanceDecision = await pickBestAmbulance(lat, lng);
-  const hospitalDecision = await pickBestHospital(lat, lng, normalizedSeverity);
+  const [ambulances, hospitals] = await Promise.all([db.listAmbulances(), db.listHospitals()]);
 
-  const ambulanceChoice = ambulanceDecision.best;
-  const hospitalChoice = hospitalDecision.best;
+  const availableAmbulances = ambulances
+    .filter((ambulance) => ambulance.status === AMBULANCE_STATUS.FREE)
+    .map((ambulance) => {
+      const ambulanceToUserDistanceKm = haversineDistance(ambulance.lat, ambulance.lng, lat, lng);
+      return {
+        ambulance,
+        ambulanceToUserDistanceKm,
+        ambulanceToUserSeconds: computeTravelSeconds(ambulanceToUserDistanceKm),
+      };
+    })
+    .sort((a, b) => a.ambulanceToUserSeconds - b.ambulanceToUserSeconds || a.ambulanceToUserDistanceKm - b.ambulanceToUserDistanceKm);
 
-  const etaDistance = ambulanceChoice ? ambulanceChoice.distanceKm : 8;
-  const etaTrafficMultiplier = ambulanceChoice ? ambulanceChoice.trafficMultiplier : 1;
-  const etaSeconds = computeEtaSeconds(etaDistance, normalizedSeverity, etaTrafficMultiplier);
+  const evaluatedHospitals = hospitals.map((hospital) => {
+    const eligibility = evaluateHospitalEligibility(hospital, type);
+    const userToHospitalDistanceKm = haversineDistance(lat, lng, hospital.lat, hospital.lng);
+    return {
+      hospital,
+      ...eligibility,
+      userToHospitalDistanceKm,
+      userToHospitalSeconds: computeTravelSeconds(userToHospitalDistanceKm),
+    };
+  });
+
+  const eligibleHospitals = evaluatedHospitals
+    .filter((item) => item.isEligible)
+    .sort((a, b) => a.userToHospitalSeconds - b.userToHospitalSeconds || b.capacity - a.capacity);
+
+  const rejectedHospitals = evaluatedHospitals.filter((item) => !item.isEligible);
+
+  const rankedPairs = [];
+  for (const ambulanceEntry of availableAmbulances) {
+    for (const hospitalEntry of eligibleHospitals) {
+      rankedPairs.push({
+        ambulance: ambulanceEntry.ambulance,
+        hospital: hospitalEntry.hospital,
+        ambulanceToUserDistanceKm: ambulanceEntry.ambulanceToUserDistanceKm,
+        ambulanceToUserSeconds: ambulanceEntry.ambulanceToUserSeconds,
+        userToHospitalDistanceKm: hospitalEntry.userToHospitalDistanceKm,
+        userToHospitalSeconds: hospitalEntry.userToHospitalSeconds,
+        totalDistanceKm: ambulanceEntry.ambulanceToUserDistanceKm + hospitalEntry.userToHospitalDistanceKm,
+        totalEtaSeconds: ambulanceEntry.ambulanceToUserSeconds + hospitalEntry.userToHospitalSeconds,
+        capacity: hospitalEntry.capacity,
+      });
+    }
+  }
+
+  rankedPairs.sort((a, b) => {
+    if (a.totalEtaSeconds !== b.totalEtaSeconds) return a.totalEtaSeconds - b.totalEtaSeconds;
+    if (b.capacity !== a.capacity) return b.capacity - a.capacity;
+    return a.totalDistanceKm - b.totalDistanceKm;
+  });
+
+  const selectedPair = rankedPairs[0] || null;
+  const decisionExplanation = buildDecisionExplanation({
+    emergencyType: type,
+    severity: normalizedSeverity,
+    availableAmbulances,
+    eligibleHospitals,
+    rejectedHospitals,
+    rankedPairs,
+    selectedPair,
+  });
   const meta = buildAssignmentMeta({
     severity: normalizedSeverity,
-    ambulanceBest: ambulanceChoice,
-    hospitalBest: hospitalChoice,
-    ambulanceRanked: ambulanceDecision.ranked,
-    hospitalRanked: hospitalDecision.ranked,
+    availableAmbulances,
+    eligibleHospitals,
+    rankedPairs,
+    selectedPair,
+    decisionExplanation,
   });
 
   return {
     severity: normalizedSeverity,
-    assignedAmbulanceId: ambulanceChoice ? ambulanceChoice.ambulance.id : null,
-    assignedHospitalId: hospitalChoice ? hospitalChoice.hospital.id : null,
-    etaSeconds,
+    assignedAmbulanceId: selectedPair ? selectedPair.ambulance.id : null,
+    assignedHospitalId: selectedPair ? selectedPair.hospital.id : null,
+    etaSeconds: selectedPair ? selectedPair.totalEtaSeconds : 0,
+    selectedAmbulance: selectedPair ? selectedPair.ambulance : null,
+    selectedHospital: selectedPair ? { ...selectedPair.hospital, capacity: selectedPair.capacity } : null,
+    estimatedTotalTimeSeconds: selectedPair ? selectedPair.totalEtaSeconds : 0,
     assignmentConfidence: meta.assignmentConfidence,
     assignmentReasons: meta.assignmentReasons,
     ambulanceCandidates: meta.ambulanceCandidates,
     hospitalCandidates: meta.hospitalCandidates,
+    combinationCandidates: meta.combinationCandidates,
+    decisionExplanation,
   };
 }
 

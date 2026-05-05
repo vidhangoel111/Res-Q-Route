@@ -6,6 +6,8 @@ const store = {
   ambulances: [],
   emergencies: [],
   hospitalHistory: [],
+  adminLogs: [],
+  ambulanceLogs: [],
 };
 
 function now() {
@@ -188,6 +190,67 @@ async function updateEmergency(id, updates) {
   return clone(emergency);
 }
 
+async function createAdminLog(payload) {
+  const timestamp = now();
+  const entry = {
+    id: payload.id || randomUUID(),
+    adminId: payload.adminId || null,
+    adminName: payload.adminName || null,
+    action: payload.action || "UNKNOWN",
+    details: payload.details || "",
+    affectedEntityType: payload.affectedEntityType || null, // 'emergency', 'ambulance', 'hospital', 'user'
+    affectedEntityId: payload.affectedEntityId || null,
+    timestamp,
+    createdAt: timestamp,
+  };
+
+  store.adminLogs.push(entry);
+  return clone(entry);
+}
+
+async function listAdminLogs(filters = {}) {
+  const logs = store.adminLogs.filter((log) => {
+    if (filters.adminId && log.adminId !== filters.adminId) return false;
+    if (filters.affectedEntityType && log.affectedEntityType !== filters.affectedEntityType) return false;
+    if (filters.affectedEntityId && log.affectedEntityId !== filters.affectedEntityId) return false;
+    return true;
+  });
+
+  return cloneList(sortByCreatedAtDesc(logs));
+}
+
+async function createAmbulanceLog(payload) {
+  const timestamp = now();
+  const entry = {
+    id: payload.id || randomUUID(),
+    ambulanceId: payload.ambulanceId || null,
+    ambulanceName: payload.ambulanceName || null,
+    action: payload.action || "UNKNOWN", // 'INCIDENT_ASSIGNED', 'INCIDENT_STARTED', 'INCIDENT_COMPLETED', 'STATUS_CHANGED'
+    details: payload.details || "",
+    emergencyId: payload.emergencyId || null,
+    driverId: payload.driverId || null,
+    driverName: payload.driverName || null,
+    lat: payload.lat || null,
+    lng: payload.lng || null,
+    timestamp,
+    createdAt: timestamp,
+  };
+
+  store.ambulanceLogs.push(entry);
+  return clone(entry);
+}
+
+async function listAmbulanceLogs(filters = {}) {
+  const logs = store.ambulanceLogs.filter((log) => {
+    if (filters.ambulanceId && log.ambulanceId !== filters.ambulanceId) return false;
+    if (filters.emergencyId && log.emergencyId !== filters.emergencyId) return false;
+    if (filters.action && log.action !== filters.action) return false;
+    return true;
+  });
+
+  return cloneList(sortByCreatedAtDesc(logs));
+}
+
 module.exports = {
   provider: "memory",
   connect,
@@ -209,4 +272,8 @@ module.exports = {
   getEmergencyById,
   listEmergencies,
   updateEmergency,
+  createAdminLog,
+  listAdminLogs,
+  createAmbulanceLog,
+  listAmbulanceLogs,
 };

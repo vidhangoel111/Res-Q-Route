@@ -11,7 +11,7 @@ const router = express.Router();
 
 const updateStatusSchema = z.object({
   body: z.object({
-    status: z.enum([AMBULANCE_STATUS.AVAILABLE, AMBULANCE_STATUS.BUSY, AMBULANCE_STATUS.MAINTENANCE]),
+    status: z.enum([AMBULANCE_STATUS.FREE, AMBULANCE_STATUS.BUSY, AMBULANCE_STATUS.MAINTENANCE, AMBULANCE_STATUS.AVAILABLE]),
   }),
   params: z.object({ id: z.string().min(1) }),
   query: z.object({}),

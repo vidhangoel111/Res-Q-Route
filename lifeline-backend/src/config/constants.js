@@ -5,7 +5,8 @@ const USER_ROLES = {
 };
 
 const AMBULANCE_STATUS = {
-  AVAILABLE: "available",
+  AVAILABLE: "available", // legacy compatibility
+  FREE: "FREE",
   BUSY: "busy",
   MAINTENANCE: "maintenance",
 };

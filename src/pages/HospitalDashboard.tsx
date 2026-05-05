@@ -57,17 +57,34 @@ const HospitalDashboard = () => {
         : []
     );
 
-    setAuditLog(
-      Array.isArray(emergencyRows)
-        ? emergencyRows
-            .filter((item: { assignedHospitalId?: string; createdAt?: string; status: string }) => item.assignedHospitalId === currentHospital?.id)
-            .slice(0, 10)
-            .map((item: { status: string; createdAt?: string; id: string }) => ({
-              action: `${item.id} → ${item.status}`,
-              time: item.createdAt ? new Date(item.createdAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
-            }))
-        : []
-    );
+    // Fetch hospital history logs
+    if (currentHospital?.id) {
+      try {
+        const historyResponse = await apiFetch(`/hospitals/${currentHospital.id}/history`);
+        const historyData = await historyResponse.json();
+        setAuditLog(
+          Array.isArray(historyData)
+            ? historyData.slice(0, 10).map((item: { action: string; details: string; createdAt?: string }) => ({
+                action: `${item.action}`,
+                time: item.createdAt ? new Date(item.createdAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
+              }))
+            : []
+        );
+      } catch (e) {
+        // Fallback to emergency-based audit log if history endpoint fails
+        setAuditLog(
+          Array.isArray(emergencyRows)
+            ? emergencyRows
+                .filter((item: { assignedHospitalId?: string; createdAt?: string; status: string }) => item.assignedHospitalId === currentHospital?.id)
+                .slice(0, 10)
+                .map((item: { status: string; createdAt?: string; id: string }) => ({
+                  action: `${item.id} → ${item.status}`,
+                  time: item.createdAt ? new Date(item.createdAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
+                }))
+            : []
+        );
+      }
+    }
   };
 
   useEffect(() => {

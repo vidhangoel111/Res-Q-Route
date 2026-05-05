@@ -60,4 +60,20 @@ router.patch(
   })
 );
 
+router.get(
+  "/:id/history",
+  authenticate,
+  authorize(USER_ROLES.HOSPITAL, USER_ROLES.ADMIN),
+  asyncHandler(async (req, res) => {
+    const hospitalId = req.params.id;
+
+    if (req.user.role === USER_ROLES.HOSPITAL && req.user.hospitalId !== hospitalId) {
+      return res.status(403).json({ message: "Hospital users can view only their own hospital history" });
+    }
+
+    const history = await db.listHospitalHistory({ hospitalId });
+    res.json(history);
+  })
+);
+
 module.exports = router;

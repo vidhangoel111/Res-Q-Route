@@ -11,6 +11,8 @@ function mapRow(row) {
     icuBeds: row.icuBeds ?? row.icu_beds,
     emergencyBeds: row.emergencyBeds ?? row.emergency_beds,
     totalBeds: row.totalBeds ?? row.total_beds,
+    capacity: row.capacity,
+    burnUnit: row.burnUnit ?? Boolean(row.burn_unit),
     vehicleNo: row.vehicleNo ?? row.vehicle_no,
     driverName: row.driverName ?? row.driver_name,
     hospitalId: row.hospitalId ?? row.hospital_id,
@@ -66,10 +68,15 @@ async function migrate() {
       emergency_beds INT NOT NULL,
       total_beds INT NOT NULL,
       occupancy INT NOT NULL,
+      capacity INT NOT NULL DEFAULT 0,
+      burn_unit BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  await pool.query("ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS capacity INT NOT NULL DEFAULT 0");
+  await pool.query("ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS burn_unit BOOLEAN NOT NULL DEFAULT FALSE");
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ambulances (
@@ -142,8 +149,8 @@ async function seed(seedData) {
 
   for (const hospital of seedData.hospitals) {
     await pool.query(
-      "INSERT INTO hospitals (id, name, lat, lng, icu_beds, emergency_beds, total_beds, occupancy) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [hospital.id, hospital.name, hospital.lat, hospital.lng, hospital.icuBeds, hospital.emergencyBeds, hospital.totalBeds, hospital.occupancy]
+      "INSERT INTO hospitals (id, name, lat, lng, icu_beds, emergency_beds, total_beds, occupancy, capacity, burn_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [hospital.id, hospital.name, hospital.lat, hospital.lng, hospital.icuBeds, hospital.emergencyBeds, hospital.totalBeds, hospital.occupancy, hospital.capacity || 0, Boolean(hospital.burnUnit)]
     );
   }
 
@@ -186,14 +193,14 @@ async function createUser(payload) {
 
 async function listHospitals() {
   const [rows] = await pool.query(
-    "SELECT id, name, lat, lng, icu_beds, emergency_beds, total_beds, occupancy FROM hospitals ORDER BY name ASC"
+    "SELECT id, name, lat, lng, icu_beds, emergency_beds, total_beds, occupancy, capacity, burn_unit FROM hospitals ORDER BY name ASC"
   );
   return rows.map(mapRow);
 }
 
 async function getHospitalById(id) {
   const [rows] = await pool.query(
-    "SELECT id, name, lat, lng, icu_beds, emergency_beds, total_beds, occupancy FROM hospitals WHERE id = ? LIMIT 1",
+    "SELECT id, name, lat, lng, icu_beds, emergency_beds, total_beds, occupancy, capacity, burn_unit FROM hospitals WHERE id = ? LIMIT 1",
     [id]
   );
   return mapRow(rows[0]);

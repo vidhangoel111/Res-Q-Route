@@ -53,6 +53,18 @@ const simulateSchema = z.object({
   query: z.object({}),
 });
 
+const guestCreateEmergencySchema = z.object({
+  body: z.object({
+    userId: z.string().min(8).optional(),
+    phone: z.string().min(8).optional(),
+    type: z.enum(["Accident", "Cardiac", "Other"]),
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  params: z.object({}),
+  query: z.object({}),
+});
+
 function isLikelyDuplicate(existing, incoming) {
   const createdAt = new Date(existing.createdAt || existing.created_at || Date.now());
   const ageMs = Date.now() - createdAt.getTime();
@@ -80,6 +92,110 @@ router.post(
       assignment,
       message: "Simulation completed. No emergency record was created.",
     });
+  })
+);
+
+router.post(
+  "/guest",
+  validate(guestCreateEmergencySchema),
+  asyncHandler(async (req, res) => {
+    const payload = req.validated.body;
+    const guestUserId = payload.userId || `RESQ-GUEST-${randomUUID().slice(0, 4).toUpperCase()}`;
+    const description = `Guest emergency request (${payload.type})`;
+
+    const assignment = await assignResources({
+      lat: payload.lat,
+      lng: payload.lng,
+      type: payload.type,
+      description,
+    });
+
+    const emergency = await db.createEmergency({
+      id: `EMR-${randomUUID().slice(0, 8).toUpperCase()}`,
+      patientName: "Guest",
+      phone: payload.phone || "NOT_PROVIDED",
+      type: payload.type,
+      description,
+      lat: payload.lat,
+      lng: payload.lng,
+      severity: assignment.severity,
+      status: assignment.assignedAmbulanceId ? EMERGENCY_STATUS.ASSIGNED : "REQUESTED",
+      assignedAmbulanceId: assignment.assignedAmbulanceId,
+      assignedHospitalId: assignment.assignedHospitalId,
+      etaSeconds: assignment.etaSeconds,
+      createdByUserId: guestUserId,
+      guestUserId,
+      isGuest: true,
+    });
+
+    if (assignment.assignedAmbulanceId) {
+      await db.updateAmbulance(assignment.assignedAmbulanceId, { status: AMBULANCE_STATUS.BUSY });
+      const ambulance = await db.getAmbulanceById(assignment.assignedAmbulanceId);
+      await db.createAmbulanceLog({
+        ambulanceId: assignment.assignedAmbulanceId,
+        ambulanceName: ambulance?.vehicleNo || null,
+        driverId: ambulance?.id || null,
+        driverName: ambulance?.driverName || null,
+        action: "INCIDENT_ASSIGNED",
+        details: `Assigned to guest emergency ${emergency.id} (${payload.type})`,
+        emergencyId: emergency.id,
+        lat: ambulance?.lat || null,
+        lng: ambulance?.lng || null,
+      });
+    }
+
+    if (assignment.assignedHospitalId) {
+      const hospital = await db.getHospitalById(assignment.assignedHospitalId);
+      await db.createHospitalHistory({
+        hospitalId: assignment.assignedHospitalId,
+        hospitalName: hospital?.name || null,
+        action: "EMERGENCY_CREATED",
+        details: `Guest emergency ${emergency.id} created (${payload.type}) for phone ${payload.phone || "NOT_PROVIDED"} with ETA ${assignment.etaSeconds}s.`,
+        actorUserId: guestUserId,
+        actorName: "Guest User",
+        source: "emergency",
+        emergencyId: emergency.id,
+      });
+    }
+
+    await db.createAdminLog({
+      adminId: "system",
+      adminName: "System Auto Dispatch",
+      action: "GUEST_EMERGENCY_CREATED",
+      details: `Guest emergency ${emergency.id} created with ambulance ${assignment.assignedAmbulanceId || "none"} and hospital ${assignment.assignedHospitalId || "none"}.`,
+      affectedEntityType: "emergency",
+      affectedEntityId: emergency.id,
+    });
+
+    const enriched = await enrichEmergency(emergency);
+
+    res.status(201).json({
+      ...enriched,
+      userId: guestUserId,
+      isGuest: true,
+      assignmentMeta: {
+        confidence: assignment.assignmentConfidence,
+        reasons: assignment.assignmentReasons,
+        ambulanceCandidates: assignment.ambulanceCandidates,
+        hospitalCandidates: assignment.hospitalCandidates,
+        combinationCandidates: assignment.combinationCandidates,
+        decisionExplanation: assignment.decisionExplanation,
+      },
+      message: "Guest emergency request created successfully.",
+    });
+  })
+);
+
+router.get(
+  "/guest/:id",
+  asyncHandler(async (req, res) => {
+    const emergency = await db.getEmergencyById(req.params.id);
+    if (!emergency || !emergency.isGuest) {
+      return res.status(404).json({ message: "Guest emergency not found" });
+    }
+
+    const enriched = await enrichEmergency(emergency);
+    res.json(enriched);
   })
 );
 
@@ -122,6 +238,20 @@ router.post(
 
     if (assignment.assignedAmbulanceId) {
       await db.updateAmbulance(assignment.assignedAmbulanceId, { status: AMBULANCE_STATUS.BUSY });
+      
+      // Log ambulance incident assignment
+      const ambulance = await db.getAmbulanceById(assignment.assignedAmbulanceId);
+      await db.createAmbulanceLog({
+        ambulanceId: assignment.assignedAmbulanceId,
+        ambulanceName: ambulance?.vehicleNo || null,
+        driverId: ambulance?.id || null,
+        driverName: ambulance?.driverName || null,
+        action: "INCIDENT_ASSIGNED",
+        details: `Assigned to emergency ${emergency.id} for ${payload.patientName} (${assignment.severity} - ${payload.type})`,
+        emergencyId: emergency.id,
+        lat: ambulance?.lat || null,
+        lng: ambulance?.lng || null,
+      });
     }
 
     if (assignment.assignedHospitalId) {
@@ -138,6 +268,18 @@ router.post(
       });
     }
 
+    // Log admin activity for emergency creation
+    if (req.user.role === USER_ROLES.ADMIN) {
+      await db.createAdminLog({
+        adminId: req.user.sub,
+        adminName: req.user.name,
+        action: "EMERGENCY_CREATED",
+        details: `Created emergency ${emergency.id} for patient ${payload.patientName} with severity ${assignment.severity}`,
+        affectedEntityType: "emergency",
+        affectedEntityId: emergency.id,
+      });
+    }
+
     const enriched = await enrichEmergency(emergency);
     res.status(201).json({
       ...enriched,
@@ -146,6 +288,8 @@ router.post(
         reasons: assignment.assignmentReasons,
         ambulanceCandidates: assignment.ambulanceCandidates,
         hospitalCandidates: assignment.hospitalCandidates,
+        combinationCandidates: assignment.combinationCandidates,
+        decisionExplanation: assignment.decisionExplanation,
       },
     });
   })
@@ -215,7 +359,21 @@ router.patch(
       updates.completedAt = new Date();
 
       if (emergency.assignedAmbulanceId) {
-        await db.updateAmbulance(emergency.assignedAmbulanceId, { status: AMBULANCE_STATUS.AVAILABLE });
+        await db.updateAmbulance(emergency.assignedAmbulanceId, { status: AMBULANCE_STATUS.FREE });
+        
+        // Log ambulance incident completion
+        const ambulance = await db.getAmbulanceById(emergency.assignedAmbulanceId);
+        await db.createAmbulanceLog({
+          ambulanceId: emergency.assignedAmbulanceId,
+          ambulanceName: ambulance?.vehicleNo || null,
+          driverId: ambulance?.id || null,
+          driverName: ambulance?.driverName || null,
+          action: "INCIDENT_COMPLETED",
+          details: `Completed emergency ${emergency.id} for ${emergency.patientName}`,
+          emergencyId: emergency.id,
+          lat: ambulance?.lat || null,
+          lng: ambulance?.lng || null,
+        });
       }
 
       if (emergency.assignedHospitalId) {
@@ -231,6 +389,43 @@ router.patch(
           emergencyId: emergency.id,
         });
       }
+    } else {
+      // Log other status changes for ambulance
+      if (emergency.assignedAmbulanceId && (req.validated.body.status === EMERGENCY_STATUS.EN_ROUTE || req.validated.body.status === EMERGENCY_STATUS.ARRIVED || req.validated.body.status === EMERGENCY_STATUS.TRANSPORTING)) {
+        const ambulance = await db.getAmbulanceById(emergency.assignedAmbulanceId);
+        const statusActionMap = {
+          [EMERGENCY_STATUS.EN_ROUTE]: "INCIDENT_STARTED",
+          [EMERGENCY_STATUS.ARRIVED]: "INCIDENT_ARRIVED",
+          [EMERGENCY_STATUS.TRANSPORTING]: "INCIDENT_TRANSPORTING",
+        };
+        
+        const action = statusActionMap[req.validated.body.status];
+        if (action) {
+          await db.createAmbulanceLog({
+            ambulanceId: emergency.assignedAmbulanceId,
+            ambulanceName: ambulance?.vehicleNo || null,
+            driverId: ambulance?.id || null,
+            driverName: ambulance?.driverName || null,
+            action,
+            details: `Emergency ${emergency.id} status changed to ${req.validated.body.status}`,
+            emergencyId: emergency.id,
+            lat: ambulance?.lat || null,
+            lng: ambulance?.lng || null,
+          });
+        }
+      }
+    }
+
+    // Log admin activity for status changes
+    if (req.user.role === USER_ROLES.ADMIN) {
+      await db.createAdminLog({
+        adminId: req.user.sub,
+        adminName: req.user.name,
+        action: `EMERGENCY_STATUS_CHANGED_TO_${req.validated.body.status}`,
+        details: `Changed emergency ${emergency.id} status to ${req.validated.body.status}`,
+        affectedEntityType: "emergency",
+        affectedEntityId: emergency.id,
+      });
     }
 
     const updated = await db.updateEmergency(emergency.id, updates);
@@ -288,7 +483,68 @@ router.post(
         reasons: assignment.assignmentReasons,
         ambulanceCandidates: assignment.ambulanceCandidates,
         hospitalCandidates: assignment.hospitalCandidates,
+        combinationCandidates: assignment.combinationCandidates,
+        decisionExplanation: assignment.decisionExplanation,
       },
+    });
+  })
+);
+
+// Admin logs endpoint
+router.get(
+  "/logs/admin",
+  authenticate,
+  authorize(USER_ROLES.ADMIN),
+  asyncHandler(async (req, res) => {
+    const logs = await db.listAdminLogs({
+      adminId: req.query.adminId ? req.query.adminId.toString() : undefined,
+      affectedEntityType: req.query.entityType ? req.query.entityType.toString() : undefined,
+      affectedEntityId: req.query.entityId ? req.query.entityId.toString() : undefined,
+    });
+    res.json(logs);
+  })
+);
+
+// Ambulance logs endpoint
+router.get(
+  "/logs/ambulance/:ambulanceId",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const logs = await db.listAmbulanceLogs({
+      ambulanceId: req.params.ambulanceId,
+      emergencyId: req.query.emergencyId ? req.query.emergencyId.toString() : undefined,
+    });
+    res.json(logs);
+  })
+);
+
+// Emergency incident logs (ambulance logs for specific emergency)
+router.get(
+  "/:emergencyId/logs",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const emergency = await db.getEmergencyById(req.params.emergencyId);
+    if (!emergency) {
+      return res.status(404).json({ message: "Emergency not found" });
+    }
+
+    // Check permissions
+    if (req.user.role === USER_ROLES.USER && emergency.createdByUserId !== req.user.sub) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    if (req.user.role === USER_ROLES.HOSPITAL && emergency.assignedHospitalId !== req.user.hospitalId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const ambulanceLogs = await db.listAmbulanceLogs({ emergencyId: req.params.emergencyId });
+    const hospitalLogs = await db.listHospitalHistory({ source: "emergency" });
+    const filteredHospitalLogs = hospitalLogs.filter(log => log.emergencyId === req.params.emergencyId);
+
+    res.json({
+      emergencyId: req.params.emergencyId,
+      ambulanceLogs,
+      hospitalLogs: filteredHospitalLogs,
     });
   })
 );

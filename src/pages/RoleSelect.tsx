@@ -71,6 +71,13 @@ const RoleSelect = () => {
         Select Your Role
       </h2>
 
+      <button
+        onClick={() => navigate("/guest/request")}
+        className="relative z-10 mb-6 rounded-lg gradient-emergency text-emergency-foreground px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+      >
+        Request Emergency (Guest / No Login)
+      </button>
+
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl px-6">
         {roles.map((role, i) => (
           <button

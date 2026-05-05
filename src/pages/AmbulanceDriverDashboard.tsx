@@ -1,20 +1,41 @@
 import { useAuth } from "@/context/AuthContext";
-import { Activity, LogOut, Truck, MapPin, AlertTriangle, Navigation, RotateCcw } from "lucide-react";
+import { Activity, LogOut, Truck, MapPin, AlertTriangle, Navigation, RotateCcw, Clock } from "lucide-react";
 import { MOCK_AMBULANCES, MOCK_HOSPITALS } from "@/data/mockData";
 import { RealTimeEmergencyMap } from "@/components/RealTimeEmergencyMap";
 import { useLocationTracking } from "@/hooks/use-location-tracking";
 import { useSocket } from "@/hooks/use-socket";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 const AmbulanceDriverDashboard = () => {
   const { user, logout } = useAuth();
   const [ambulanceId] = useState("a1");
+  const [incidentLogs, setIncidentLogs] = useState<any[]>([]);
   
   // Auto GPS tracking - no manual enable needed!
   const { position, error, isTracking } = useLocationTracking(ambulanceId);
   
   // Real-time socket connection
   const { isConnected } = useSocket();
+
+  useEffect(() => {
+    const fetchIncidentLogs = async () => {
+      try {
+        const response = await apiFetch(`/emergencies/logs/ambulance/${ambulanceId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setIncidentLogs(Array.isArray(data) ? data.slice(0, 6) : []);
+        }
+      } catch (e) {
+        // Fail silently if logs are not available
+      }
+    };
+
+    fetchIncidentLogs();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchIncidentLogs, 30000);
+    return () => clearInterval(interval);
+  }, [ambulanceId]);
 
   const handleLogout = () => {
     logout();
@@ -222,6 +243,26 @@ const AmbulanceDriverDashboard = () => {
             <button className="w-full flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
               <RotateCcw className="w-4 h-4" /> Refresh Location
             </button>
+
+            {/* Incident Logs */}
+            <div className="glass-card p-4 animate-fade-in">
+              <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-clinical" /> Incident Logs
+              </h3>
+              {incidentLogs.length > 0 ? (
+                <div className="space-y-2 max-h-40 overflow-y-auto text-xs">
+                  {incidentLogs.map((log) => (
+                    <div key={log.id} className="border-l-2 border-clinical/40 pl-2 py-1">
+                      <p className="text-foreground font-medium">{log.action}</p>
+                      <p className="text-muted-foreground text-[11px]">{log.details}</p>
+                      <p className="text-muted-foreground text-[10px] mt-0.5">{log.createdAt ? new Date(log.createdAt).toLocaleTimeString() : "Unknown"}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No incidents assigned yet</p>
+              )}
+            </div>
           </div>
         </div>
       </main>

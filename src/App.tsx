@@ -6,6 +6,8 @@ import AdminAuth from "./pages/AdminAuth";
 import UserDashboard from "./pages/UserDashboard";
 import HospitalDashboard from "./pages/HospitalDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import GuestEmergencyRequest from "./pages/GuestEmergencyRequest";
+import GuestEmergencyTracking from "./pages/GuestEmergencyTracking";
 import NotFound from "./pages/NotFound";
 
 function ProtectedRoute({ role, children }: { role: string; children: React.ReactNode }) {
@@ -24,6 +26,8 @@ const App = () => (
         <Route path="/login/:role" element={<Login />} />
         {/* Dedicated admin auth portal with Google OAuth */}
         <Route path="/admin-auth" element={<AdminAuth />} />
+        <Route path="/guest/request" element={<GuestEmergencyRequest />} />
+        <Route path="/guest/track/:id" element={<GuestEmergencyTracking />} />
         <Route path="/dashboard/user" element={<ProtectedRoute role="user"><UserDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/hospital" element={<ProtectedRoute role="hospital"><HospitalDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />

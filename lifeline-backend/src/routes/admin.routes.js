@@ -56,7 +56,7 @@ router.get(
       : 0;
 
     const ambulanceUtilization = ambulances.length
-      ? Math.round((ambulances.filter((item) => item.status !== "available").length / ambulances.length) * 100)
+      ? Math.round((ambulances.filter((item) => !["available", "FREE"].includes(item.status)).length / ambulances.length) * 100)
       : 0;
 
     const bedOccupancy = hospitals.length

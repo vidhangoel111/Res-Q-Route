@@ -40,6 +40,8 @@ export interface Hospital {
   emergencyBeds: number;
   totalBeds: number;
   occupancy: number;
+  capacity: number;
+  burnUnit: boolean;
 }
 
 export interface AuditLog {

@@ -24,6 +24,8 @@ const hospitalSchema = new mongoose.Schema(
     emergencyBeds: Number,
     totalBeds: Number,
     occupancy: Number,
+    capacity: Number,
+    burnUnit: { type: Boolean, default: false },
   },
   { timestamps: true, versionKey: false }
 );
